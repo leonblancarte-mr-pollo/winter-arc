@@ -21,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <div className="mx-auto min-h-dvh max-w-2xl px-4 pb-28 pt-[calc(1rem+env(safe-area-inset-top))]">{children}</div>
+      <div className="mx-auto min-h-dvh max-w-5xl px-4 pb-32 pt-[calc(1.5rem+env(safe-area-inset-top))] sm:px-8">{children}</div>
       <BottomNav />
     </>
   );

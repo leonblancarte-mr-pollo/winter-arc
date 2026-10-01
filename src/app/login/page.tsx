@@ -1,11 +1,10 @@
 "use client";
 // Pantalla de inicio de sesión y registro
-import { Snowflake } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import ConfigMissing from "@/components/ConfigMissing";
-import { ErrorBox } from "@/components/ui";
+import { ErrorBox, Notice, Wordmark } from "@/components/ui";
 import { errorES, supabase, supabaseConfigured } from "@/lib/supabase";
 
 export default function LoginPage() {
@@ -46,7 +45,7 @@ export default function LoginPage() {
         });
         if (error) throw error;
         if (data.session) router.replace("/calendario");
-        else setInfo("¡Cuenta creada! Revisa tu correo y confirma tu cuenta para poder entrar.");
+        else setInfo("Cuenta creada. Confirma tu correo desde el enlace que te enviamos y luego entra.");
       }
     } catch (err) {
       setError(errorES((err as Error).message));
@@ -55,79 +54,85 @@ export default function LoginPage() {
     }
   }
 
+
+  const switchMode = (m: "login" | "signup") => {
+    setMode(m);
+    setError(null);
+    setInfo(null);
+  };
+
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-10">
-      <div className="mb-10 text-center">
-        <Snowflake className="mx-auto mb-3 text-ice" size={44} strokeWidth={1.75} />
-        <h1 className="text-4xl font-black tracking-tight">WINTER ARC</h1>
-        <p className="mt-2 text-sm text-neutral-400">1 de octubre – 31 de diciembre 2026</p>
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-12">
+      <div className="mb-12 text-center">
+        <Wordmark size="lg" />
+        <p className="mt-3 text-fg2">1 de octubre al 31 de diciembre</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 rounded-xl border border-line bg-card p-1">
-        {(["login", "signup"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => {
-              setMode(m);
-              setError(null);
-              setInfo(null);
-            }}
-            className={`rounded-lg py-2 text-sm font-semibold transition ${
-              mode === m ? "bg-card2 text-white" : "text-neutral-500"
-            }`}
-          >
-            {m === "login" ? "Entrar" : "Crear cuenta"}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={submit} className="flex flex-col gap-3">
+      <form onSubmit={submit} className="flex flex-col gap-4">
         {mode === "signup" && (
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-400">Nombre para mostrar</span>
+          <Field label="Nombre para mostrar" hint="Así te verán en el ranking y en el chat">
             <input
               className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Así te verán en el ranking y chat"
               maxLength={30}
               autoComplete="nickname"
             />
-          </label>
+          </Field>
         )}
-        <label className="flex flex-col gap-1">
-          <span className="text-sm text-neutral-400">Correo</span>
+        <Field label="Correo">
           <input
             className="input"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="tu@correo.com"
             autoComplete="email"
             required
           />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm text-neutral-400">Contraseña</span>
+        </Field>
+        <Field label="Contraseña">
           <input
             className="input"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Mínimo 6 caracteres"
+            placeholder={mode === "signup" ? "Mínimo 6 caracteres" : undefined}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             required
           />
-        </label>
+        </Field>
 
         {error && <ErrorBox message={error} />}
-        {info && <div className="rounded-xl border border-ice/40 bg-ice/10 p-3 text-sm text-ice">{info}</div>}
+        {info && <Notice>{info}</Notice>}
 
         <button className="btn-primary mt-2" disabled={busy}>
-          {busy ? "Un momento…" : mode === "login" ? "Entrar" : "Crear cuenta y unirme"}
+          {busy ? "Un momento" : mode === "login" ? "Entrar" : "Crear cuenta"}
         </button>
       </form>
+
+      <p className="mt-6 text-center text-fg2">
+        {mode === "login" ? "¿Primera vez aquí? " : "¿Ya tienes cuenta? "}
+        <button
+          type="button"
+          onClick={() => switchMode(mode === "login" ? "signup" : "login")}
+          className="font-medium text-fg underline decoration-fg3 underline-offset-4 transition-colors duration-150 hover:decoration-fg"
+        >
+          {mode === "login" ? "Crea tu cuenta" : "Entra"}
+        </button>
+      </p>
+
+      <p className="mt-16 text-center text-xs text-zinc-500">La disciplina no se negocia.</p>
     </main>
+  );
+}
+
+// Campo con etiqueta pequeña arriba
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-2">
+      <span className="label">{label}</span>
+      {children}
+      {hint && <span className="text-xs text-fg3">{hint}</span>}
+    </label>
   );
 }

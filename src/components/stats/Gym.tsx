@@ -2,14 +2,14 @@
 // 7) Sección Gym: importador del CSV de Hevy + gráficas de progreso
 import { Dumbbell, Trophy, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ErrorBox, SectionTitle, Spinner } from "@/components/ui";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartLegend, ErrorBox, Notice, SectionTitle, Spinner } from "@/components/ui";
 import { CHART_COLORS, COMPETITION_END, COMPETITION_START } from "@/lib/constants";
 import { addDays, dateInMX, shortLabel, weekStart } from "@/lib/dates";
 import { parseHevyFile } from "@/lib/hevy";
 import { errorES, fetchAll, supabase } from "@/lib/supabase";
 import type { WorkoutSet } from "@/lib/types";
-import { axisProps, tooltipStyle } from "./chartTheme";
+import { axisProps, gridStroke, tooltipStyle } from "./chartTheme";
 
 const BATCH = 500;
 const WEEKS_SHOWN = 16;
@@ -181,18 +181,20 @@ export default function Gym({ userId, today, onGymDaysMarked }: { userId: string
     <section>
       <SectionTitle
         right={
-          <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-primary px-3 py-2 text-sm">
+          <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-secondary">
             <Upload size={16} /> Subir CSV de Hevy
           </button>
         }
       >
-        <span className="flex items-center gap-2">
-          <Dumbbell size={20} className="text-ice" /> Gym (Hevy)
-        </span>
+        Gym
       </SectionTitle>
       <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
 
-      {status && <div className="mb-3 rounded-xl border border-ice/40 bg-ice/10 p-3 text-sm text-ice">{status}</div>}
+      {status && (
+        <div className="mb-3">
+          <Notice>{status}</Notice>
+        </div>
+      )}
       {error && (
         <div className="mb-3">
           <ErrorBox message={error} />
@@ -202,18 +204,22 @@ export default function Gym({ userId, today, onGymDaysMarked }: { userId: string
       {!sets ? (
         <Spinner />
       ) : !stats ? (
-        <div className="card text-sm text-neutral-400">
-          En Hevy ve a <b className="text-white">Perfil → Ajustes → Exportar e importar datos → Exportar entrenamientos</b>. Te dará un archivo
-          .csv; súbelo aquí. Puedes subirlo las veces que quieras: los sets repetidos no se duplican.
+        <div className="card flex items-start gap-3 text-fg2">
+          <Dumbbell size={16} className="mt-1 shrink-0 text-fg3" />
+          <p>
+            En Hevy ve a <span className="text-fg">Perfil, Ajustes, Exportar e importar datos, Exportar entrenamientos</span>. Sube aquí el
+            archivo .csv que te da. Puedes subirlo las veces que quieras: los sets repetidos no se duplican.
+          </p>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="card">
-              <h3 className="mb-2 text-sm font-semibold text-neutral-400">Entrenamientos por semana</h3>
+              <h3 className="label mb-4">Entrenamientos por semana</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={stats.perWeek} margin={{ left: -28, right: 0, top: 8 }}>
-                  <XAxis dataKey="semana" {...axisProps} fontSize={9} interval={3} />
+                  <CartesianGrid stroke={gridStroke} vertical={false} />
+                  <XAxis dataKey="semana" {...axisProps} interval={3} />
                   <YAxis {...axisProps} allowDecimals={false} />
                   <Tooltip {...tooltipStyle} labelFormatter={(l) => `Semana del ${l}`} />
                   <Bar dataKey="Entrenamientos" fill={CHART_COLORS.green} radius={[4, 4, 0, 0]} />
@@ -221,10 +227,11 @@ export default function Gym({ userId, today, onGymDaysMarked }: { userId: string
               </ResponsiveContainer>
             </div>
             <div className="card">
-              <h3 className="mb-2 text-sm font-semibold text-neutral-400">Volumen semanal (kg)</h3>
+              <h3 className="label mb-4">Volumen semanal (kg)</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={stats.perWeek} margin={{ left: -12, right: 0, top: 8 }}>
-                  <XAxis dataKey="semana" {...axisProps} fontSize={9} interval={3} />
+                  <CartesianGrid stroke={gridStroke} vertical={false} />
+                  <XAxis dataKey="semana" {...axisProps} interval={3} />
                   <YAxis {...axisProps} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} />
                   <Tooltip {...tooltipStyle} labelFormatter={(l) => `Semana del ${l}`} formatter={(v) => [`${Number(v).toLocaleString("es-MX")} kg`, "Volumen"]} />
                   <Bar dataKey="Volumen" fill={CHART_COLORS.violet} radius={[4, 4, 0, 0]} />
@@ -232,13 +239,13 @@ export default function Gym({ userId, today, onGymDaysMarked }: { userId: string
               </ResponsiveContainer>
             </div>
           </div>
-          <p className="mt-2 text-xs text-neutral-500">
-            {stats.totalWorkouts} entrenamientos importados en total. El volumen es peso × reps sin contar calentamientos.
+          <p className="mt-2 text-xs text-fg3">
+            {stats.totalWorkouts} entrenamientos importados. El volumen es peso por repeticiones, sin contar calentamientos.
           </p>
 
           <div className="card mt-3">
-            <label className="mb-3 flex flex-col gap-1">
-              <span className="text-sm font-semibold text-neutral-400">Progreso por ejercicio</span>
+            <label className="mb-6 flex flex-col gap-2">
+              <span className="label">Progreso por ejercicio</span>
               <select className="input" value={selected} onChange={(e) => setExercise(e.target.value)}>
                 {exerciseList.map((e) => (
                   <option key={e.name} value={e.name}>
@@ -250,30 +257,35 @@ export default function Gym({ userId, today, onGymDaysMarked }: { userId: string
 
             {progress && progress.chart.length > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={progress.chart} margin={{ left: -16, right: 8, top: 8 }}>
-                    <CartesianGrid stroke="#1f1f1f" vertical={false} />
-                    <XAxis dataKey="fecha" {...axisProps} minTickGap={20} />
+                    <CartesianGrid stroke={gridStroke} vertical={false} />
+                    <XAxis dataKey="fecha" {...axisProps} minTickGap={24} />
                     <YAxis {...axisProps} domain={["auto", "auto"]} unit=" kg" width={64} />
                     <Tooltip {...tooltipStyle} formatter={(v, n) => [`${v} kg`, n]} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="Mejor peso" stroke={CHART_COLORS.cyan} strokeWidth={2.5} dot={{ r: 2.5 }} />
-                    <Line type="monotone" dataKey="1RM estimado" stroke={CHART_COLORS.orange} strokeWidth={2.5} dot={{ r: 2.5 }} strokeDasharray="5 3" />
+                    <Line type="monotone" dataKey="Mejor peso" stroke={CHART_COLORS.green} strokeWidth={2} dot={{ r: 2 }} />
+                    <Line type="monotone" dataKey="1RM estimado" stroke={CHART_COLORS.violet} strokeWidth={2} dot={{ r: 2 }} strokeDasharray="4 4" />
                   </LineChart>
                 </ResponsiveContainer>
+                <ChartLegend
+                  items={[
+                    { label: "Mejor peso", color: CHART_COLORS.green },
+                    { label: "1RM estimado", color: CHART_COLORS.violet },
+                  ]}
+                />
 
-                <h3 className="mb-2 mt-4 flex items-center gap-2 text-sm font-semibold text-neutral-400">
-                  <Trophy size={16} className="text-gold" /> Mis récords en este ejercicio
+                <h3 className="mb-3 mt-8 flex items-center gap-2 font-medium">
+                  <Trophy size={16} className="text-fg2" /> Récords en este ejercicio
                 </h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <PR label="Peso máximo" value={`${progress.pr.weight} kg × ${progress.pr.weightReps}`} date={progress.pr.weightDate} color={CHART_COLORS.cyan} />
-                  <PR label="1RM estimado" value={`${round1(progress.pr.e1rm)} kg`} date={progress.pr.e1rmDate} color={CHART_COLORS.orange} />
-                  <PR label="Más reps en un set" value={`${progress.pr.reps}`} color={CHART_COLORS.green} />
-                  <PR label="Mejor volumen en sesión" value={`${Math.round(progress.pr.volume).toLocaleString("es-MX")} kg`} date={progress.pr.volumeDate} color={CHART_COLORS.violet} />
+                <div className="grid grid-cols-2 gap-2">
+                  <PR label="Peso máximo" value={`${progress.pr.weight} kg × ${progress.pr.weightReps}`} date={progress.pr.weightDate} />
+                  <PR label="1RM estimado" value={`${round1(progress.pr.e1rm)} kg`} date={progress.pr.e1rmDate} />
+                  <PR label="Más reps en un set" value={`${progress.pr.reps}`} />
+                  <PR label="Mejor volumen en sesión" value={`${Math.round(progress.pr.volume).toLocaleString("es-MX")} kg`} date={progress.pr.volumeDate} />
                 </div>
               </>
             ) : (
-              <p className="text-sm text-neutral-500">Este ejercicio no tiene sets con peso y repeticiones (por ejemplo cardio o estiramiento).</p>
+              <p className="text-fg3">Este ejercicio no tiene sets con peso y repeticiones, como el cardio o los estiramientos.</p>
             )}
           </div>
         </>
@@ -282,14 +294,16 @@ export default function Gym({ userId, today, onGymDaysMarked }: { userId: string
   );
 }
 
-function PR({ label, value, date, color }: { label: string; value: string; date?: string; color: string }) {
+function PR({ label, value, date }: { label: string; value: string; date?: string }) {
   return (
-    <div className="rounded-xl bg-card2 p-3">
-      <div className="text-xs text-neutral-500">{label}</div>
-      <div className="text-lg font-black tabular-nums" style={{ color }}>
-        {value}
-      </div>
-      {date && <div className="text-xs text-neutral-500">{shortLabel(date)} {date.slice(0, 4)}</div>}
+    <div className="rounded-lg bg-raised p-3">
+      <div className="text-xs text-fg2">{label}</div>
+      <div className="display mt-1 text-3xl">{value}</div>
+      {date && (
+        <div className="text-xs text-fg3">
+          {shortLabel(date)} {date.slice(0, 4)}
+        </div>
+      )}
     </div>
   );
 }

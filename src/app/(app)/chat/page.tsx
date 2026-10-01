@@ -88,40 +88,47 @@ export default function ChatPage() {
   const today = todayMX();
 
   return (
-    <main className="flex min-h-[calc(100dvh-8rem)] flex-col">
-      <header className="mb-3">
-        <p className="text-xs uppercase tracking-[0.2em] text-ice">Winter Arc</p>
-        <h1 className="text-2xl font-black">Chat</h1>
-      </header>
+    <main className="mx-auto flex min-h-[calc(100dvh-10rem)] max-w-2xl flex-col">
+      <h1 className="display mb-6 text-5xl">Chat</h1>
 
-      <div className="flex flex-1 flex-col gap-2 pb-20">
+      <div className="flex flex-1 flex-col pb-24">
         {!messages ? (
           <Spinner />
         ) : messages.length === 0 ? (
-          <p className="py-10 text-center text-sm text-neutral-500">Nadie ha escrito todavía. ¡Rompe el hielo!</p>
+          <p className="py-12 text-center text-fg3">Todavía no hay mensajes. Escribe el primero.</p>
         ) : (
           messages.map((m, i) => {
             const mine = m.user_id === userId;
             const day = dateInMX(m.created_at);
             const prev = messages[i - 1];
+            const next = messages[i + 1];
             const newDay = !prev || dateInMX(prev.created_at) !== day;
-            const sameAuthor = prev && !newDay && prev.user_id === m.user_id;
+            const firstOfGroup = newDay || prev.user_id !== m.user_id;
+            const lastOfGroup = !next || next.user_id !== m.user_id || dateInMX(next.created_at) !== day;
+            const name = names[m.user_id] ?? "";
             return (
               <div key={m.id}>
                 {newDay && (
-                  <div className="my-3 text-center text-xs font-medium text-neutral-500">
-                    {day === today ? "Hoy" : <span className="capitalize">{longLabel(day)}</span>}
+                  <div className="my-6 text-center text-xs text-fg3">
+                    {day === today ? "Hoy" : <span className="inline-block first-letter:uppercase">{longLabel(day)}</span>}
                   </div>
                 )}
-                <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-3.5 py-2 ${
-                      mine ? "rounded-br-md bg-ice text-black" : "rounded-bl-md border border-line bg-card2 text-white"
-                    }`}
-                  >
-                    {!mine && !sameAuthor && <div className="mb-0.5 text-xs font-bold text-ice">{names[m.user_id] ?? "…"}</div>}
-                    <div className="whitespace-pre-wrap break-words">{m.content}</div>
-                    <div className={`mt-0.5 text-right text-[10px] ${mine ? "text-black/60" : "text-neutral-500"}`}>{timeInMX(m.created_at)}</div>
+                <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"} ${firstOfGroup ? "mt-4" : "mt-1"}`}>
+                  {!mine && (
+                    <div className="w-7 shrink-0">
+                      {lastOfGroup && <Avatar name={name} />}
+                    </div>
+                  )}
+                  <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
+                    {!mine && firstOfGroup && <span className="mb-1 px-1 text-xs font-medium text-fg2">{name}</span>}
+                    <div
+                      className={`whitespace-pre-wrap break-words rounded-xl px-3 py-2 ${
+                        mine ? "bg-sky-400/15 text-sky-200" : "bg-zinc-900 text-white"
+                      }`}
+                    >
+                      {m.content}
+                    </div>
+                    {lastOfGroup && <span className="mt-1 px-1 text-[11px] tabular-nums text-zinc-600">{timeInMX(m.created_at)}</span>}
                   </div>
                 </div>
               </div>
@@ -134,7 +141,7 @@ export default function ChatPage() {
       {/* Campo de texto fijo arriba de la barra inferior */}
       <form
         onSubmit={send}
-        className="fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-30 border-t border-line bg-black/95 px-4 py-2 backdrop-blur"
+        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-hairline bg-black/80 px-4 py-3 backdrop-blur-xl"
       >
         {error && (
           <div className="mx-auto mb-2 max-w-2xl">
@@ -143,8 +150,9 @@ export default function ChatPage() {
         )}
         <div className="mx-auto flex max-w-2xl gap-2">
           <input
-            className="input flex-1 rounded-full py-2.5"
-            placeholder="Escribe un mensaje…"
+            className="input flex-1 py-2"
+            placeholder="Escribe un mensaje"
+            aria-label="Mensaje"
             value={text}
             maxLength={1000}
             onChange={(e) => setText(e.target.value)}
@@ -158,13 +166,29 @@ export default function ChatPage() {
           <button
             type="submit"
             disabled={!text.trim() || sending}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ice text-black transition active:scale-95 disabled:opacity-40"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-black transition-colors duration-150 ease-out hover:bg-zinc-100 disabled:opacity-30"
             aria-label="Enviar"
           >
-            <SendHorizontal size={20} />
+            <SendHorizontal size={16} />
           </button>
         </div>
       </form>
     </main>
+  );
+}
+
+// Círculo con las iniciales del nombre
+function Avatar({ name }: { name: string }) {
+  const initials =
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+  return (
+    <div className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-raised text-[11px] font-medium text-fg2" aria-hidden>
+      {initials}
+    </div>
   );
 }

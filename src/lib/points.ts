@@ -59,7 +59,7 @@ export function pointsOn(checks: ChecksByDate, bonuses: BonusEvent[], date: stri
   return countOn(checks, date) * POINTS_PER_HABIT + bonuses.filter((b) => b.date === date).reduce((s, b) => s + b.points, 0);
 }
 
-// Racha actual: días seguidos con 5+/7 hasta ayer; hoy se suma si ya llegó a 5.
+// Racha actual: días seguidos con STREAK_MIN_HABITS+ hasta ayer; hoy se suma si ya llegó.
 export function currentStreak(checks: ChecksByDate, today = todayMX()) {
   const ok = (d: string) => countOn(checks, d) >= STREAK_MIN_HABITS;
   let streak = ok(today) ? 1 : 0;
@@ -94,3 +94,13 @@ export function pointsByWeek(checks: ChecksByDate, bonuses: BonusEvent[]) {
 }
 
 export const HABIT_KEYS = HABITS.map((h) => h.key);
+
+// Mis datos "como estaban" en una fecha (para comparar contra la semana pasada)
+export function checksUpTo(checks: ChecksByDate, cutoff: string): ChecksByDate {
+  const out: ChecksByDate = {};
+  for (const d in checks) if (d <= cutoff) out[d] = checks[d];
+  return out;
+}
+export function bonusesUpTo(bonuses: BonusEvent[], cutoff: string) {
+  return bonuses.filter((b) => b.date <= cutoff);
+}

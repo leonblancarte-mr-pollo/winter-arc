@@ -1,9 +1,9 @@
 "use client";
-// Panel de un día: lista de los 7 hábitos para tachar
-import { Check, Lock } from "lucide-react";
+// Panel de un día: los hábitos para tachar, progreso semanal y accesos a los bonus
+import { BookOpen, Check, ChevronRight, Lock, Medal } from "lucide-react";
 import HabitIcon from "@/components/HabitIcon";
 import { Sheet } from "@/components/ui";
-import { HABITS, WEEKLY_BONUSES } from "@/lib/constants";
+import { BOOK_BONUS, HABITS, HALF_MARATHON_BONUS, WEEKLY_BONUSES } from "@/lib/constants";
 import { longLabel } from "@/lib/dates";
 import { weekHabitCount, type ChecksByDate } from "@/lib/points";
 
@@ -13,39 +13,46 @@ export default function DaySheet({
   checks,
   onToggle,
   onClose,
+  onOpenBonus,
 }: {
   date: string | null;
   today: string;
   checks: ChecksByDate;
   onToggle: (date: string, key: string, on: boolean) => void;
   onClose: () => void;
+  onOpenBonus: (type: "book" | "half") => void;
 }) {
   if (!date) return null;
   const isFuture = date > today;
   const isPast = date < today;
   const done = checks[date] ?? new Set<string>();
+  const total = HABITS.length;
 
   return (
     <Sheet
       open
+      variant="drawer"
       onClose={onClose}
       title={
         <div>
-          <div className="capitalize">{date === today ? "Hoy" : longLabel(date)}</div>
-          <div className="text-sm font-normal text-neutral-400">
-            {date === today && <span className="capitalize">{longLabel(date)} · </span>}
-            <span className="font-bold text-white tabular-nums">{done.size}/7</span> hábitos
+          <div className="text-sm text-fg2 first-letter:uppercase">{date === today ? `Hoy, ${longLabel(date)}` : longLabel(date)}</div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className={`display text-5xl ${done.size === total ? "text-done" : "text-fg"}`}>
+              {done.size}
+              <span className="text-fg3">/{total}</span>
+            </span>
+            <span className="text-fg2">hábitos</span>
           </div>
         </div>
       }
     >
       {isFuture && (
-        <div className="mb-3 flex items-center gap-2 rounded-xl bg-card2 p-3 text-sm text-neutral-400">
-          <Lock size={16} /> Este día todavía no llega. Podrás tacharlo cuando sea el día.
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-raised px-3 py-2 text-fg2">
+          <Lock size={16} /> Podrás tacharlo cuando llegue el día.
         </div>
       )}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="-mx-2 flex flex-col">
         {HABITS.map((h) => {
           const on = done.has(h.key);
           const missed = isPast && !on;
@@ -54,27 +61,29 @@ export default function DaySheet({
               <button
                 disabled={isFuture}
                 onClick={() => onToggle(date, h.key, !on)}
-                className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.99] disabled:cursor-not-allowed ${
-                  on
-                    ? "border-done/50 bg-done/10"
-                    : missed
-                      ? "border-miss/40 bg-miss/10 opacity-70"
-                      : "border-line bg-card2"
-                } ${isFuture ? "opacity-40" : ""}`}
+                aria-pressed={on}
+                className={`group flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors duration-150 ease-out enabled:hover:bg-white/[0.04] disabled:cursor-not-allowed ${
+                  isFuture ? "opacity-40" : ""
+                }`}
               >
                 <HabitIcon
                   name={h.icon}
-                  size={20}
-                  className={on ? "text-done" : missed ? "text-red-300/60" : "text-neutral-400"}
+                  size={16}
+                  className={`shrink-0 transition-colors duration-150 ${on ? "text-done" : missed ? "text-red-400/50" : "text-fg2"}`}
                 />
-                <span className={`flex-1 font-medium ${on ? "text-done" : missed ? "text-neutral-400" : ""}`}>{h.label}</span>
                 <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition ${
-                    on ? "border-done bg-done text-black" : "border-neutral-600"
+                  className={`flex-1 transition-colors duration-150 ${
+                    on ? "text-done line-through decoration-done/40" : missed ? "text-fg3" : "text-fg"
                   }`}
                 >
-                  {on && <Check size={16} strokeWidth={3.5} />}
-                  {isFuture && !on && <Lock size={12} className="text-neutral-600" />}
+                  {h.label}
+                </span>
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors duration-150 ${
+                    on ? "border-done bg-done text-black" : missed ? "border-red-400/30" : "border-zinc-600"
+                  }`}
+                >
+                  {on && <Check key="on" size={12} strokeWidth={3} className="animate-check" />}
                 </span>
               </button>
             </li>
@@ -82,22 +91,53 @@ export default function DaySheet({
         })}
       </ul>
 
-      {/* Progreso de bonus semanales */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        {WEEKLY_BONUSES.map((b) => {
-          const n = weekHabitCount(checks, date, b.habit);
-          const ok = n >= b.times;
-          return (
-            <div key={b.habit} className={`rounded-xl border p-3 text-xs ${ok ? "border-done/50 text-done" : "border-line text-neutral-400"}`}>
-              <div className="font-semibold">Bonus semanal +{b.points}</div>
-              <div className="mt-0.5">
-                {b.habit === "gym" ? "Gym" : "Cardio"}: <b className="tabular-nums">{Math.min(n, b.times)}/{b.times}</b>
-                {ok && " ✓"}
+      {/* Progreso de los bonus semanales */}
+      <div className="mt-6 border-t border-line pt-6">
+        <div className="label mb-3">Bonus de la semana</div>
+        <div className="flex flex-col gap-3">
+          {WEEKLY_BONUSES.map((b) => {
+            const n = Math.min(weekHabitCount(checks, date, b.habit), b.times);
+            const ok = n >= b.times;
+            return (
+              <div key={b.habit} className="flex items-center gap-3">
+                <span className="w-24 shrink-0 text-fg2">{b.habit === "gym" ? "Gym" : "Cardio"}</span>
+                <div className="flex flex-1 gap-1">
+                  {Array.from({ length: b.times }).map((_, i) => (
+                    <span key={i} className={`h-1 flex-1 rounded-full ${i < n ? (ok ? "bg-done" : "bg-accent") : "bg-white/[0.08]"}`} />
+                  ))}
+                </div>
+                <span className={`w-12 text-right text-xs tabular-nums ${ok ? "text-done" : "text-fg3"}`}>
+                  {ok ? `+${b.points}` : `${n}/${b.times}`}
+                </span>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+
+      {/* Bonus especiales */}
+      {!isFuture && (
+        <div className="mt-6 grid grid-cols-2 gap-2">
+          <BonusCard icon={<BookOpen size={16} />} label="Terminé un libro" points={BOOK_BONUS} onClick={() => onOpenBonus("book")} />
+          <BonusCard icon={<Medal size={16} />} label="Corrí 21 km" points={HALF_MARATHON_BONUS} onClick={() => onOpenBonus("half")} />
+        </div>
+      )}
     </Sheet>
+  );
+}
+
+function BonusCard({ icon, label, points, onClick }: { icon: React.ReactNode; label: string; points: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-3 text-left transition-colors duration-150 ease-out hover:bg-raised"
+    >
+      <span className="flex items-center justify-between text-fg2">
+        {icon}
+        <ChevronRight size={16} className="text-fg3" />
+      </span>
+      <span className="font-medium">{label}</span>
+      <span className="text-xs text-fg3">+{points} puntos</span>
+    </button>
   );
 }

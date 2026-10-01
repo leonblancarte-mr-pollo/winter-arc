@@ -16,7 +16,7 @@ export const COMPETITION_MONTHS = [
   { year: 2026, month: 12 },
 ];
 
-// Los 7 hábitos. "key" es lo que se guarda en la base de datos: no lo cambies
+// Los 8 hábitos (el máximo diario es HABITS.length). "key" es lo que se guarda en la base de datos: no lo cambies
 // una vez que la carrera empezó (perderías los hábitos ya marcados).
 export const HABITS = [
   { key: "gym", label: "Ir al gym", short: "Gym", icon: "Dumbbell" },
@@ -25,7 +25,8 @@ export const HABITS = [
   { key: "dormir", label: "Dormir 7 horas mínimo", short: "Dormir", icon: "Moon" },
   { key: "pasos", label: "10,000 pasos", short: "Pasos", icon: "Footprints" },
   { key: "pantalla", label: "Menos de 5 hrs de tiempo en pantalla", short: "Pantalla", icon: "Smartphone" },
-  { key: "proyecto", label: "1 hr de trabajo en proyecto personal", short: "Proyecto", icon: "Rocket" },
+  { key: "proyecto", label: "1 hr de trabajo en proyecto personal", short: "Proyecto", icon: "Hammer" },
+  { key: "no_pajiza", label: "No chaketa", short: "No chaketa", icon: "ShieldCheck" },
 ] as const;
 
 export type HabitKey = (typeof HABITS)[number]["key"];
@@ -43,8 +44,8 @@ export const WEEKLY_BONUSES = [
   { habit: "gym" as HabitKey, times: 5, points: 5, label: "5 días de gym en la semana" },
 ];
 
-// Mínimo de hábitos al día para que cuente en la racha
-export const STREAK_MIN_HABITS = 5;
+// Mínimo de hábitos al día para que cuente en la racha (6 de 8)
+export const STREAK_MIN_HABITS = 6;
 
 // Tipos de actividad manual
 export const ACTIVITY_TYPES = [
@@ -57,13 +58,12 @@ export const ACTIVITY_TYPES = [
 
 export type ActivityType = (typeof ACTIVITY_TYPES)[number]["key"];
 
-// Colores brillantes para gráficas
+// Colores de las gráficas del dashboard. Cada métrica tiene SIEMPRE el mismo color:
+// cian = hábitos/puntos, rosa = bonus, naranja = racha, violeta = posición/fuerza, verde = actividad/gym
 export const CHART_COLORS = {
-  cyan: "#22d3ee",
-  green: "#39ff88",
+  cyan: "#38bdf8",
   violet: "#a78bfa",
+  pink: "#f472b6",
   orange: "#fb923c",
-  magenta: "#f472b6",
-  gold: "#facc15",
-  red: "#f87171",
+  green: "#4ade80",
 };

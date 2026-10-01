@@ -1,12 +1,14 @@
 // Aviso cuando faltan las llaves de Supabase en .env.local
+import { Wordmark } from "./ui";
+
 export default function ConfigMissing() {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6">
-      <h1 className="text-2xl font-black text-ice">Falta conectar Supabase</h1>
-      <p className="text-neutral-300">
-        Abre el archivo <code className="text-ice">.env.local</code> y pega tu <b>Project URL</b> y tu{" "}
-        <b>anon key</b> de Supabase. Después detén la app (Ctrl + C) y vuelve a correr{" "}
-        <code className="text-ice">npm run dev</code>.
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-6">
+      <Wordmark />
+      <h1 className="text-xl font-semibold">Falta conectar Supabase</h1>
+      <p className="text-fg2">
+        Abre el archivo <code className="text-accent">.env.local</code> y pega tu Project URL y tu anon key de Supabase. Después
+        detén la app con Ctrl + C y vuelve a correr <code className="text-accent">npm run dev</code>.
       </p>
     </main>
   );

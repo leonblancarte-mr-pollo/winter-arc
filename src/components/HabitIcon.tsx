@@ -1,7 +1,19 @@
 // Ícono de cada hábito (los nombres vienen de constants.ts)
-import { BookOpen, Dumbbell, Footprints, HeartPulse, Moon, Rocket, Smartphone, Check, type LucideProps } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  Dumbbell,
+  Footprints,
+  Hammer,
+  HeartPulse,
+  Moon,
+  Rocket,
+  ShieldCheck,
+  Smartphone,
+  type LucideProps,
+} from "lucide-react";
 
-const ICONS = { BookOpen, Dumbbell, Footprints, HeartPulse, Moon, Rocket, Smartphone };
+const ICONS = { BookOpen, Dumbbell, Footprints, Hammer, HeartPulse, Moon, Rocket, ShieldCheck, Smartphone };
 
 export default function HabitIcon({ name, ...props }: { name: string } & LucideProps) {
   const Icon = ICONS[name as keyof typeof ICONS] ?? Check;

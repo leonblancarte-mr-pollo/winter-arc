@@ -1,12 +1,24 @@
 "use client";
 // Piezas de interfaz reutilizables
-import { Loader2, X } from "lucide-react";
+import { Loader2, Minus, TrendingDown, TrendingUp, X } from "lucide-react";
 import { useEffect } from "react";
 
-export function Spinner({ label = "Cargando…" }: { label?: string }) {
+// Logo: wordmark "WINTER ARC" en la fuente editorial
+export function Wordmark({ size = "sm" }: { size?: "sm" | "lg" }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-10 text-neutral-400">
-      <Loader2 className="animate-spin" size={20} />
+    <span
+      className={`display uppercase tracking-[0.1em] text-fg ${size === "lg" ? "text-5xl" : "text-xl"}`}
+      aria-label="Winter Arc"
+    >
+      Winter Arc
+    </span>
+  );
+}
+
+export function Spinner({ label = "Cargando" }: { label?: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-12 text-fg3">
+      <Loader2 className="animate-spin" size={16} />
       <span>{label}</span>
     </div>
   );
@@ -14,10 +26,10 @@ export function Spinner({ label = "Cargando…" }: { label?: string }) {
 
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="whitespace-pre-line rounded-xl border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">
+    <div className="whitespace-pre-line rounded-lg border border-red-500/20 bg-red-500/[0.06] px-3 py-2 text-sm text-red-300">
       {message}
       {onRetry && (
-        <button onClick={onRetry} className="ml-2 font-semibold text-red-200 underline">
+        <button onClick={onRetry} className="ml-2 font-medium text-red-200 underline underline-offset-2">
           Reintentar
         </button>
       )}
@@ -25,16 +37,23 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
   );
 }
 
-// Panel que sube desde abajo (en computadora se ve centrado)
+export function Notice({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-lg border border-accent/20 bg-accent/[0.06] px-3 py-2 text-sm text-sky-200">{children}</div>;
+}
+
+// Panel que sube desde abajo en celular.
+// En computadora: "drawer" entra por la derecha, "modal" aparece centrado.
 export function Sheet({
   open,
   onClose,
   title,
+  variant = "modal",
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: React.ReactNode;
+  variant?: "drawer" | "modal";
   children: React.ReactNode;
 }) {
   useEffect(() => {
@@ -45,14 +64,23 @@ export function Sheet({
   }, [open, onClose]);
 
   if (!open) return null;
+  const drawer = variant === "drawer";
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+    <div
+      className={`fixed inset-0 z-50 flex items-end justify-center ${drawer ? "sm:items-stretch sm:justify-end" : "sm:items-center"}`}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="animate-fade absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="animate-sheet relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-line bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:rounded-3xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="text-lg font-bold">{title}</div>
-          <button onClick={onClose} aria-label="Cerrar" className="rounded-full p-1 text-neutral-400 hover:bg-card2">
-            <X size={22} />
+      <div
+        className={`animate-sheet ${drawer ? "is-drawer" : "is-modal"} relative max-h-[90dvh] w-full overflow-y-auto rounded-t-xl border border-line bg-surface p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] ${
+          drawer ? "sm:max-h-none sm:max-w-md sm:rounded-none sm:border-y-0 sm:border-r-0" : "sm:max-w-md sm:rounded-xl"
+        }`}
+      >
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="min-w-0">{title}</div>
+          <button onClick={onClose} aria-label="Cerrar" className="icon-btn -mr-2 -mt-1">
+            <X size={16} />
           </button>
         </div>
         {children}
@@ -61,12 +89,12 @@ export function Sheet({
   );
 }
 
-// Anillo de progreso (0 a 1)
+// Anillo de progreso delgado (0 a 1)
 export function Ring({
   value,
   size = 36,
-  stroke = 4,
-  color = "#22d3ee",
+  stroke = 2,
+  color = "#38bdf8",
   children,
 }: {
   value: number;
@@ -79,8 +107,8 @@ export function Ring({
   const c = 2 * Math.PI * r;
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="#262626" strokeWidth={stroke} fill="none" />
+      <svg width={size} height={size} className="-rotate-90" aria-hidden>
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} fill="none" />
         {value > 0 && (
           <circle
             cx={size / 2}
@@ -92,7 +120,7 @@ export function Ring({
             strokeLinecap="round"
             strokeDasharray={c}
             strokeDashoffset={c * (1 - Math.min(1, value))}
-            style={{ transition: "stroke-dashoffset 0.3s ease" }}
+            style={{ transition: "stroke-dashoffset 150ms ease-out, stroke 150ms ease-out" }}
           />
         )}
       </svg>
@@ -101,7 +129,7 @@ export function Ring({
   );
 }
 
-// Animación de "+N puntos"
+// Aviso de "+N puntos" al registrar un bonus
 export function PointsBurst({ points, onDone }: { points: number | null; onDone: () => void }) {
   useEffect(() => {
     if (points == null) return;
@@ -110,32 +138,50 @@ export function PointsBurst({ points, onDone }: { points: number | null; onDone:
   }, [points, onDone]);
   if (points == null) return null;
   return (
-    <div className="pointer-events-none fixed left-1/2 top-1/3 z-[60] animate-points">
-      <div className="rounded-3xl border border-done/40 bg-black/90 px-8 py-5 text-center shadow-[0_0_60px_rgba(57,255,136,0.35)]">
-        <div className="text-5xl font-black text-done">+{points}</div>
-        <div className="mt-1 text-sm font-semibold uppercase tracking-widest text-neutral-300">puntos</div>
+    <div className="pointer-events-none fixed left-1/2 top-1/3 z-[60] animate-points" role="status">
+      <div className="rounded-xl border border-done/30 bg-surface px-8 py-6 text-center">
+        <div className="display text-6xl text-done">+{points}</div>
+        <div className="label mt-2">puntos sumados</div>
       </div>
     </div>
   );
 }
 
-export function Stat({ label, value, sub, color }: { label: string; value: React.ReactNode; sub?: string; color?: string }) {
+// Flecha de tendencia contra hace 7 días (delta positivo = mejoró)
+export function Trend({ delta, suffix = "" }: { delta: number | null; suffix?: string }) {
+  if (delta == null) return <span className="text-xs text-fg3">Primera semana</span>;
+  const Icon = delta === 0 ? Minus : delta > 0 ? TrendingUp : TrendingDown;
+  const color = delta === 0 ? "text-fg3" : delta > 0 ? "text-done" : "text-danger";
   return (
-    <div className="rounded-2xl border border-line bg-card p-4">
-      <div className="text-xs font-medium uppercase tracking-wider text-neutral-500">{label}</div>
-      <div className="mt-1 text-3xl font-black tabular-nums" style={{ color }}>
-        {value}
-      </div>
-      {sub && <div className="mt-0.5 text-xs text-neutral-500">{sub}</div>}
-    </div>
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${color}`}>
+      <Icon size={12} />
+      {delta === 0 ? "Sin cambio" : `${delta > 0 ? "+" : "−"}${Math.abs(delta)}${suffix}`}
+      <span className="font-normal text-fg3">vs hace 7 días</span>
+    </span>
   );
 }
 
-export function SectionTitle({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
+export function SectionTitle({ children, right, id }: { children: React.ReactNode; right?: React.ReactNode; id?: string }) {
   return (
-    <div className="mb-3 mt-8 flex items-center justify-between">
-      <h2 className="text-lg font-bold">{children}</h2>
+    <div className="mb-4 mt-12 flex items-center justify-between gap-4">
+      <h2 id={id} className="text-xl font-semibold tracking-tight">
+        {children}
+      </h2>
       {right}
+    </div>
+  );
+}
+
+// Leyenda de gráficas en HTML (evita que Recharts mida y re-mida su leyenda)
+export function ChartLegend({ items }: { items: { label: string; color: string }[] }) {
+  return (
+    <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-fg2">
+      {items.map((it) => (
+        <span key={it.label} className="inline-flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full" style={{ background: it.color }} />
+          {it.label}
+        </span>
+      ))}
     </div>
   );
 }
