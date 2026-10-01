@@ -11,3 +11,4 @@ Archivos clave:
 - `src/lib/points.ts` → cálculo de puntos, rachas y bonus semanales.
 - `src/lib/hevy.ts` → lector del CSV de Hevy.
 - `src/app/(app)/calendario | stats | chat` → las 3 pantallas.
+ 
