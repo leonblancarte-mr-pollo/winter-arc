@@ -15,12 +15,33 @@ export class HttpError extends Error {
   }
 }
 
+// Revisa que la llave sea la SECRETA (service_role) y no la pública (anon / publishable).
+// Con la pública, Supabase aplica RLS y responde "permission denied" o "violates row-level security".
+function keyProblem(key: string): string | null {
+  if (key.startsWith("sb_secret_")) return null;
+  if (key.startsWith("sb_publishable_")) return "es la Publishable key (pública)";
+  try {
+    const role = JSON.parse(Buffer.from(key.split(".")[1] ?? "", "base64url").toString()).role;
+    if (role === "service_role") return null;
+    return role ? `es la llave "${role}" (pública)` : "no parece una llave de Supabase";
+  } catch {
+    return "no parece una llave de Supabase";
+  }
+}
+
 function getAdmin(): SupabaseClient {
   if (admin) return admin;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!url || !key) {
     throw new HttpError(500, "El casino no está configurado: falta SUPABASE_SERVICE_ROLE_KEY en el servidor.");
+  }
+  const problem = keyProblem(key);
+  if (problem) {
+    throw new HttpError(
+      500,
+      `La llave SUPABASE_SERVICE_ROLE_KEY ${problem}. Pon la service_role / Secret key de Supabase en Vercel y vuelve a desplegar.`,
+    );
   }
   admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   return admin;
