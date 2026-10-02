@@ -271,9 +271,9 @@ function SystemMessage({
 }) {
   const { Icon, text } = systemParts(content);
   async function view() {
-    const url = await signedPhotoUrl(photoPath!);
-    if (url) onPhoto(url);
-    else onError("No se pudo abrir la foto.");
+    const res = await signedPhotoUrl(photoPath!);
+    if ("url" in res) onPhoto(res.url);
+    else onError(`No se pudo abrir la foto (${res.error}).`);
   }
   return (
     <div className="my-4 flex justify-center px-2">

@@ -48,12 +48,15 @@ export function Sheet({
   onClose,
   title,
   variant = "modal",
+  stacked = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: React.ReactNode;
   variant?: "drawer" | "modal";
+  // Se abre encima de otro panel que ya está abierto (por ejemplo, el panel del día)
+  stacked?: boolean;
   children: React.ReactNode;
 }) {
   useEffect(() => {
@@ -67,7 +70,7 @@ export function Sheet({
   const drawer = variant === "drawer";
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center ${drawer ? "sm:items-stretch sm:justify-end" : "sm:items-center"}`}
+      className={`fixed inset-0 ${stacked ? "z-[60]" : "z-50"} flex items-end justify-center ${drawer ? "sm:items-stretch sm:justify-end" : "sm:items-center"}`}
       role="dialog"
       aria-modal="true"
     >

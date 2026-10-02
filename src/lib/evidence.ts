@@ -7,9 +7,14 @@ import { supabase } from "./supabase";
 
 export type HabitEvidence = { date: string; habit_key: string; photo_path: string };
 
-export async function signedPhotoUrl(path: string): Promise<string | null> {
+// Regresa la URL temporal de la foto, o el motivo por el que no se pudo
+export async function signedPhotoUrl(path: string): Promise<{ url: string } | { error: string }> {
   const { data, error } = await supabase.storage.from("evidencias").createSignedUrl(path, 60 * 60);
-  return error || !data ? null : data.signedUrl;
+  if (error || !data) {
+    console.error("[evidencia] no se pudo firmar", path, error);
+    return { error: error?.message ?? "sin respuesta" };
+  }
+  return { url: data.signedUrl };
 }
 
 // Mi evidencia (o la de otra persona) y funciones para guardarla/quitarla
@@ -47,14 +52,14 @@ export function useEvidence(userId: string) {
     [userId],
   );
 
-  // Al destachar: se borra la referencia y también la foto
+  // Al destachar: se borra solo la referencia. La foto se queda en Storage porque el anuncio
+  // que ya se publicó en el chat sigue apuntando a ella.
   const remove = useCallback(
     async (date: string, habitKey: string) => {
       const row = rows.find((r) => r.date === date && r.habit_key === habitKey);
       if (!row) return;
       setRows((prev) => prev.filter((r) => r !== row));
       await supabase.from("habit_evidence").delete().match({ user_id: userId, date, habit_key: habitKey });
-      await supabase.storage.from("evidencias").remove([row.photo_path]);
     },
     [userId, rows],
   );
@@ -74,7 +79,7 @@ export function useDayPhotos(rows: HabitEvidence[], date: string | null) {
     Promise.all(mine.map(async (r) => [r.habit_key, await signedPhotoUrl(r.photo_path)] as const)).then((pairs) => {
       if (!alive) return;
       const map: Record<string, string> = {};
-      for (const [k, u] of pairs) if (u) map[k] = u;
+      for (const [k, u] of pairs) if ("url" in u) map[k] = u.url;
       setUrls({ key, map });
     });
     return () => {

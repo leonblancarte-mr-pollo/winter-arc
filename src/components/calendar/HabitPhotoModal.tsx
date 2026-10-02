@@ -45,7 +45,7 @@ export default function HabitPhotoModal({
   }
 
   return (
-    <Sheet open onClose={close} title={<div className="text-xl font-semibold">Evidencia: {habit.label}</div>}>
+    <Sheet open stacked onClose={close} title={<div className="text-xl font-semibold">Evidencia: {habit.label}</div>}>
       <form onSubmit={save} className="flex flex-col gap-4">
         <p className="text-fg2">
           {habitKey === "pantalla"
@@ -55,11 +55,10 @@ export default function HabitPhotoModal({
         <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-white/[0.12] bg-field px-3 py-4 text-fg2 transition-colors duration-150 hover:border-accent">
           <Camera size={16} className="shrink-0 text-accent" />
           <span className={`truncate ${file ? "text-fg" : ""}`}>{file ? file.name : habitKey === "pantalla" ? "Elegir captura" : "Tomar o elegir foto"}</span>
-          {/* Sin "capture" para la captura de pantalla (viene de la galería); con "capture" abre la cámara directo */}
+          {/* Sin "capture": así Safari y Chrome móvil ofrecen Tomar foto / Fototeca / Examinar */}
           <input
             type="file"
             accept="image/*"
-            capture={habitKey === "pantalla" ? undefined : "environment"}
             className="sr-only"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
