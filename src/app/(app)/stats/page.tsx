@@ -4,10 +4,11 @@ import { useCallback, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import Activities from "@/components/stats/Activities";
 import Gym from "@/components/stats/Gym";
-import { HabitCompliance, Heatmap, SecondaryStats, SummaryCards, WeeklyPoints } from "@/components/stats/MyProgress";
+import { CustomCompliance, HabitCompliance, Heatmap, SecondaryStats, SummaryCards, WeeklyPoints } from "@/components/stats/MyProgress";
 import Ranking from "@/components/stats/Ranking";
 import { ErrorBox, SectionTitle, Spinner } from "@/components/ui";
 import { todayMX } from "@/lib/dates";
+import { useCustomHabits } from "@/lib/useCustomHabits";
 import { useMyData } from "@/lib/useMyData";
 import { useRanking } from "@/lib/useRanking";
 
@@ -16,6 +17,7 @@ export default function StatsPage() {
   const userId = user!.id;
   const today = todayMX();
   const { checks, pointEvents: bonuses, loading, error, reload, markLocal } = useMyData(userId);
+  const custom = useCustomHabits(userId);
   const [rankKey, setRankKey] = useState(0);
   const ranking = useRanking(userId, today, rankKey);
 
@@ -75,6 +77,14 @@ export default function StatsPage() {
 
           <SectionTitle>Mapa de calor</SectionTitle>
           <Heatmap checks={checks} today={today} />
+
+          {custom.habits.length > 0 && (
+            <>
+              <SectionTitle>Mis hábitos personales</SectionTitle>
+              <p className="-mt-2 mb-4 text-xs text-fg3">Solo tú los ves. No suman puntos ni cuentan para el ranking.</p>
+              <CustomCompliance habits={custom.habits} checks={custom.checks} today={today} />
+            </>
+          )}
         </>
       )}
 

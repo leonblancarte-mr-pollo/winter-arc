@@ -109,3 +109,6 @@ export type ChessInvitation = {
   game_id: string | null;
   created_at: string;
 };
+
+// Hábitos personales: privados y sin puntos (ver supabase/habitos_personales.sql)
+export type CustomHabit = { id: number; user_id: string; name: string; icon: string | null; archived: boolean; created_at: string };

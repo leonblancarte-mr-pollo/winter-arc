@@ -4,6 +4,7 @@ import { BookOpen, ChevronLeft, ChevronRight, Image as ImageIcon, LogOut, Medal 
 import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { BookForm, HalfMarathonForm } from "@/components/calendar/BonusForms";
+import CustomHabitsSection from "@/components/calendar/CustomHabitsSection";
 import DaySheet from "@/components/calendar/DaySheet";
 import { ErrorBox, PointsBurst, Ring, Spinner, SyncBadge, Wordmark } from "@/components/ui";
 import { COMPETITION_END, COMPETITION_MONTHS, HABITS } from "@/lib/constants";
@@ -11,6 +12,7 @@ import { daysInMonth, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMo
 import { countOn, currentStreak, totalPoints } from "@/lib/points";
 import { supabase } from "@/lib/supabase";
 import type { BonusEvent } from "@/lib/types";
+import { useCustomHabits } from "@/lib/useCustomHabits";
 import { useMyData } from "@/lib/useMyData";
 
 const DONE = "#10b981";
@@ -20,6 +22,7 @@ export default function CalendarioPage() {
   const { user, profile, signOut } = useAuth();
   const userId = user!.id;
   const today = todayMX();
+  const custom = useCustomHabits(userId);
   const { checks, bonuses, pointEvents, loading, error, setError, reload, toggle, addBonusLocal, pendingCount } = useMyData(userId);
 
   // Mes inicial: el mes actual si está dentro de la carrera
@@ -178,7 +181,22 @@ export default function CalendarioPage() {
         </section>
       )}
 
-      <DaySheet date={openDay} today={today} checks={checks} onToggle={toggle} onClose={() => setOpenDay(null)} onOpenBonus={openBonus} />
+      <DaySheet date={openDay} today={today} checks={checks} onToggle={toggle} onClose={() => setOpenDay(null)} onOpenBonus={openBonus}
+        extra={
+          openDay && (
+            <CustomHabitsSection
+              date={openDay}
+              today={today}
+              habits={custom.habits}
+              checks={custom.checks}
+              error={custom.error}
+              onToggle={custom.toggle}
+              onAdd={custom.add}
+              onArchive={custom.archive}
+            />
+          )
+        }
+      />
       <BookForm open={form?.type === "book"} onClose={() => setForm(null)} userId={userId} today={today} onSaved={onBonusSaved} />
       {form?.type === "half" && (
         <HalfMarathonForm key={form.day} open onClose={() => setForm(null)} userId={userId} today={today} onSaved={onBonusSaved} defaultDate={form.day} />

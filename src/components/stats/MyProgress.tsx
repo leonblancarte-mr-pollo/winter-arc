@@ -1,10 +1,11 @@
 "use client";
 // Tarjetas de números, cumplimiento por hábito, puntos por semana y mapa de calor
+import { Star } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import HabitIcon from "@/components/HabitIcon";
 import { ChartLegend, Trend } from "@/components/ui";
 import { CHART_COLORS, COMPETITION_END, COMPETITION_START, HABITS } from "@/lib/constants";
-import { addDays, elapsedCompetitionDays, longLabel, shortLabel, weekStart } from "@/lib/dates";
+import { addDays, dateInMX, dateRange, elapsedCompetitionDays, longLabel, shortLabel, weekStart } from "@/lib/dates";
 import {
   bestStreak,
   bonusesUpTo,
@@ -17,6 +18,8 @@ import {
   type ChecksByDate,
   type PointEvent,
 } from "@/lib/points";
+import type { CustomHabit } from "@/lib/types";
+import type { CustomChecks } from "@/lib/useCustomHabits";
 
 import { axisProps, gridStroke, tooltipStyle } from "./chartTheme";
 
@@ -206,6 +209,38 @@ export function Heatmap({ checks, today }: Omit<Props, "bonuses">) {
         ))}
         <span className="ml-1">Más</span>
       </div>
+    </div>
+  );
+}
+
+// ---------- Hábitos personales (privados, sin puntos) ----------
+// % de días cumplidos desde que se creó cada hábito (o desde el inicio de la carrera) hasta hoy
+export function CustomCompliance({ habits, checks, today }: { habits: CustomHabit[]; checks: CustomChecks; today: string }) {
+  const end = today < COMPETITION_END ? today : COMPETITION_END;
+  return (
+    <div className="card flex flex-col gap-4">
+      {habits.map((h) => {
+        const created = dateInMX(h.created_at);
+        const start = created > COMPETITION_START ? created : COMPETITION_START;
+        const days = start <= end ? dateRange(start, end) : [];
+        const n = days.filter((d) => checks[d]?.has(h.id)).length;
+        const pct = days.length ? Math.round((n / days.length) * 100) : 0;
+        return (
+          <div key={h.id}>
+            <div className="mb-2 flex items-center gap-2">
+              <Star size={16} className="text-fg2" />
+              <span className="flex-1 truncate">{h.name}</span>
+              <span className="font-medium tabular-nums">{pct}%</span>
+              <span className="w-16 text-right text-xs tabular-nums text-fg3">
+                {n}/{days.length} días
+              </span>
+            </div>
+            <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: CHART_COLORS.violet }} />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

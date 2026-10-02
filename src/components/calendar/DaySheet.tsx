@@ -15,6 +15,7 @@ export default function DaySheet({
   onClose,
   onOpenBonus,
   readOnly = false,
+  extra,
 }: {
   date: string | null;
   today: string;
@@ -24,6 +25,8 @@ export default function DaySheet({
   onOpenBonus?: (type: "book" | "half") => void;
   // Perfil de otra persona: se ve qué marcó, pero no se puede tachar nada
   readOnly?: boolean;
+  // Contenido extra debajo de los hábitos oficiales (hábitos personales)
+  extra?: React.ReactNode;
 }) {
   if (!date) return null;
   const isFuture = date > today;
@@ -93,6 +96,8 @@ export default function DaySheet({
           );
         })}
       </ul>
+
+      {extra}
 
       {/* Progreso de los bonus semanales */}
       <div className="mt-6 border-t border-line pt-6">
