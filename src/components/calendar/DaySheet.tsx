@@ -1,6 +1,7 @@
 "use client";
 // Panel de un día: los hábitos para tachar, progreso semanal y accesos a los bonus
-import { BookOpen, Check, ChevronRight, Lock, Medal } from "lucide-react";
+import { BookOpen, Camera, Check, ChevronDown, ChevronRight, Lock, Medal } from "lucide-react";
+import { useState } from "react";
 import HabitIcon from "@/components/HabitIcon";
 import { Sheet } from "@/components/ui";
 import { BOOK_BONUS, HABITS, HALF_MARATHON_BONUS, WEEKLY_BONUSES } from "@/lib/constants";
@@ -31,7 +32,12 @@ export default function DaySheet({
   // Fotos de evidencia del día (hábito -> URL)
   photos?: Record<string, string>;
 }) {
+  // Evidencias expandidas (se vuelven a colapsar al cambiar de día)
+  const [expanded, setExpanded] = useState<{ date: string | null; keys: string[] }>({ date: null, keys: [] });
   if (!date) return null;
+  const openKeys = expanded.date === date ? expanded.keys : [];
+  const toggleEvidence = (key: string) =>
+    setExpanded({ date, keys: openKeys.includes(key) ? openKeys.filter((k) => k !== key) : [...openKeys, key] });
   const isFuture = date > today;
   const isPast = date < today;
   const done = checks[date] ?? new Set<string>();
@@ -96,10 +102,23 @@ export default function DaySheet({
                 </span>
               </button>
               {photos?.[h.key] && (
-                <a href={photos[h.key]} target="_blank" rel="noreferrer" className="mb-2 ml-9 block w-fit">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photos[h.key]} alt={`Evidencia: ${h.short}`} loading="lazy" className="h-24 w-auto max-w-full rounded-lg bg-zinc-900 object-cover" />
-                </a>
+                <div className="mb-2 ml-9">
+                  <button
+                    type="button"
+                    onClick={() => toggleEvidence(h.key)}
+                    aria-expanded={openKeys.includes(h.key)}
+                    className="flex items-center gap-1.5 rounded-md py-1 text-xs font-medium text-accent transition-colors duration-150 hover:text-sky-300"
+                  >
+                    <Camera size={13} /> {openKeys.includes(h.key) ? "Ocultar evidencia" : "Ver evidencia"}
+                    <ChevronDown size={13} className={`transition-transform duration-150 ${openKeys.includes(h.key) ? "rotate-180" : ""}`} />
+                  </button>
+                  {openKeys.includes(h.key) && (
+                    <a href={photos[h.key]} target="_blank" rel="noreferrer" className="animate-fade mt-2 block w-fit">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photos[h.key]} alt={`Evidencia: ${h.short}`} loading="lazy" className="h-32 w-auto max-w-full rounded-lg bg-zinc-900 object-cover" />
+                    </a>
+                  )}
+                </div>
               )}
             </li>
           );
