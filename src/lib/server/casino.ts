@@ -63,7 +63,7 @@ export async function applyBalance(
   userId: string,
   delta: number,
   type: "bet" | "bet_win",
-  game: "ruleta" | "blackjack",
+  game: "ruleta" | "blackjack" | "tragamonedas",
   meta?: Record<string, unknown>,
 ): Promise<number> {
   const { data, error } = await db.rpc("casino_apply", {
@@ -75,6 +75,9 @@ export async function applyBalance(
   });
   if (error) {
     if (error.message.includes("saldo insuficiente")) throw new HttpError(400, "No tienes peseis suficientes para esa apuesta.");
+    if (error.message.includes("check constraint")) {
+      throw new HttpError(500, "Falta actualizar el casino: corre supabase/ajedrez_y_tragamonedas.sql en Supabase.");
+    }
     if (error.message.includes("does not exist") || error.code === "PGRST202") {
       throw new HttpError(500, "Falta crear las tablas del casino: corre supabase/casino.sql en Supabase.");
     }

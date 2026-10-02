@@ -63,9 +63,9 @@ export type LeaderboardRow = {
 export type CasinoTransaction = {
   id: number;
   user_id: string;
-  type: "bet" | "bet_win" | "buy_peseis" | "unlock_power";
+  type: "bet" | "bet_win" | "buy_peseis" | "unlock_power" | "admin_grant";
   amount: number;
-  game: "ruleta" | "blackjack" | null;
+  game: "ruleta" | "blackjack" | "tragamonedas" | null;
   points_cost: number;
   meta: Record<string, unknown> | null;
   created_at: string;
@@ -79,5 +79,32 @@ export type PowerLog = {
   target_user_id: string;
   power_type: PowerType;
   detail: string | null;
+  created_at: string;
+};
+
+// Ajedrez
+export type ChessStatus = "active" | "white_won" | "black_won" | "draw" | "abandoned";
+export type ChessEndReason = "checkmate" | "stalemate" | "insufficient_material" | "threefold_repetition" | "fifty_moves" | "timeout";
+
+export type ChessGame = {
+  id: string;
+  white_user_id: string;
+  black_user_id: string;
+  fen: string;
+  pgn: string;
+  last_move: string | null; // ej. "e2e4" (para resaltar la última jugada)
+  status: ChessStatus;
+  end_reason: ChessEndReason | null;
+  turn_deadline: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChessInvitation = {
+  id: number;
+  from_user_id: string;
+  to_user_id: string;
+  status: "pending" | "accepted" | "declined";
+  game_id: string | null;
   created_at: string;
 };

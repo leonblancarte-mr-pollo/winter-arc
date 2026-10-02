@@ -1,6 +1,6 @@
 "use client";
 // PANTALLA 4: Casino (dinero ficticio "peseis", solo para divertirse)
-import { ChevronRight, CircleDot, Crown, Lock, PenLine, Spade, Sparkles } from "lucide-react";
+import { Cherry, ChevronRight, CircleDot, Crown, Lock, PenLine, Spade, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
@@ -24,6 +24,7 @@ const TX_TEXT: Record<CasinoTransaction["type"], string> = {
   bet_win: "Premio",
   buy_peseis: "Compra de peseis",
   unlock_power: "Poder desbloqueado",
+  admin_grant: "Regalo de peseis",
 };
 
 export default function CasinoPage() {
@@ -131,9 +132,12 @@ export default function CasinoPage() {
       )}
 
       {/* Juegos */}
-      <section className="mt-6 grid grid-cols-2 gap-3">
+      <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <GameCard href="/casino/ruleta" icon={<CircleDot size={24} />} title="Ruleta" text="Americana, 0 y 00" />
         <GameCard href="/casino/blackjack" icon={<Spade size={24} />} title="Blackjack" text="Paga 3 a 2" />
+        <div className="col-span-2 sm:col-span-1">
+          <GameCard href="/casino/tragamonedas" icon={<Cherry size={24} />} title="Tragamonedas" text="3 carretes, hasta ×250" />
+        </div>
       </section>
 
       {/* Poderes */}
