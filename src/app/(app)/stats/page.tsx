@@ -58,7 +58,7 @@ export default function StatsPage() {
       )}
 
       <SectionTitle>Ranking de la carrera</SectionTitle>
-      <Ranking rows={ranking.rows} userId={userId} error={ranking.error} />
+      <Ranking rows={ranking.rows} progress={ranking.progress} userId={userId} error={ranking.error} />
 
       {!loading && (
         <>

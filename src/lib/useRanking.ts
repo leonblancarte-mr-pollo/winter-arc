@@ -1,14 +1,19 @@
 "use client";
-// Ranking actual (vista SQL "leaderboard") + mi posición de hace 7 días para la flecha de tendencia
+// Ranking actual (vista SQL "leaderboard"), progresión de puntos acumulados día a día
+// de cada usuario, y mi posición de hace 7 días para la flecha de tendencia
 import { useEffect, useState } from "react";
-import { COMPETITION_START } from "./constants";
-import { addDays } from "./dates";
-import { groupChecks, totalPoints } from "./points";
+import { COMPETITION_END, COMPETITION_START } from "./constants";
+import { addDays, dateRange } from "./dates";
+import { dailyPoints, groupChecks } from "./points";
 import { errorES, fetchAll, supabase } from "./supabase";
 import type { BonusEvent, HabitCheck, LeaderboardRow } from "./types";
 
+// Una fila por día: { date, [user_id]: acumulado, [`${user_id}__d`]: puntos de ese día }
+export type ProgressRow = { date: string } & Record<string, number | string | undefined>;
+
 export function useRanking(userId: string, today: string, refreshKey: number) {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
+  const [progress, setProgress] = useState<ProgressRow[] | null>(null);
   const [prevPosition, setPrevPosition] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,31 +30,68 @@ export function useRanking(userId: string, today: string, refreshKey: number) {
       const current = (data ?? []) as LeaderboardRow[];
       setRows(current);
 
-      // Posición de hace 7 días (solo si ya pasó la primera semana)
-      const cutoff = addDays(today, -7);
-      if (cutoff < COMPETITION_START) return setPrevPosition(null);
+      // Historial de todos (hábitos y bonus de la carrera) para la gráfica
       try {
         const [checks, bonus] = await Promise.all([
           fetchAll<HabitCheck>((f, t) =>
-            supabase.from("habit_checks").select("user_id,date,habit_key").lte("date", cutoff).order("id").range(f, t),
+            supabase
+              .from("habit_checks")
+              .select("user_id,date,habit_key")
+              .gte("date", COMPETITION_START)
+              .lte("date", COMPETITION_END)
+              .order("id")
+              .range(f, t),
           ),
-          fetchAll<BonusEvent>((f, t) => supabase.from("bonus_events").select("*").lte("date", cutoff).order("id").range(f, t)),
+          fetchAll<BonusEvent>((f, t) =>
+            supabase.from("bonus_events").select("*").gte("date", COMPETITION_START).lte("date", COMPETITION_END).order("id").range(f, t),
+          ),
         ]);
         if (!alive) return;
-        const prev = current
-          .map((r) => ({
-            user_id: r.user_id,
-            name: r.display_name,
-            total: totalPoints(
+
+        // Puntos por día de cada usuario
+        const perUser = new Map(
+          current.map((r) => [
+            r.user_id,
+            dailyPoints(
               groupChecks(checks.filter((c) => c.user_id === r.user_id)),
               bonus.filter((b) => b.user_id === r.user_id),
-            ).total,
-          }))
-          .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
-        const idx = prev.findIndex((r) => r.user_id === userId);
-        setPrevPosition(idx >= 0 ? idx + 1 : null);
+            ),
+          ]),
+        );
+
+        // Acumulado día a día. Los días futuros quedan vacíos (la línea termina en hoy).
+        const lastDay = today < COMPETITION_END ? today : COMPETITION_END;
+        const running = new Map(current.map((r) => [r.user_id, 0]));
+        const series: ProgressRow[] = dateRange(COMPETITION_START, COMPETITION_END).map((date) => {
+          const row: ProgressRow = { date };
+          if (date > lastDay) return row;
+          for (const r of current) {
+            const day = perUser.get(r.user_id)?.[date] ?? 0;
+            const total = running.get(r.user_id)! + day;
+            running.set(r.user_id, total);
+            row[r.user_id] = total;
+            row[`${r.user_id}__d`] = day;
+          }
+          return row;
+        });
+        setProgress(series);
+
+        // Posición de hace 7 días (solo si ya pasó la primera semana)
+        const cutoff = addDays(today, -7);
+        const past = series.find((s) => s.date === cutoff);
+        if (cutoff < COMPETITION_START || !past) {
+          setPrevPosition(null);
+        } else {
+          const prev = current
+            .map((r) => ({ user_id: r.user_id, name: r.display_name, total: Number(past[r.user_id] ?? 0) }))
+            .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+          const idx = prev.findIndex((r) => r.user_id === userId);
+          setPrevPosition(idx >= 0 ? idx + 1 : null);
+        }
       } catch {
-        // La tendencia es opcional: si falla, solo no se muestra
+        // La gráfica y la tendencia son opcionales: si fallan, el ranking sigue visible
+        if (!alive) return;
+        setProgress([]);
         setPrevPosition(null);
       }
     })();
@@ -58,5 +100,5 @@ export function useRanking(userId: string, today: string, refreshKey: number) {
     };
   }, [userId, today, refreshKey]);
 
-  return { rows, prevPosition, error };
+  return { rows, progress, prevPosition, error };
 }

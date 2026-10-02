@@ -104,3 +104,26 @@ export function checksUpTo(checks: ChecksByDate, cutoff: string): ChecksByDate {
 export function bonusesUpTo(bonuses: BonusEvent[], cutoff: string) {
   return bonuses.filter((b) => b.date <= cutoff);
 }
+
+// Puntos ganados cada día (hábitos + bonus con esa fecha + bonus semanales).
+// Cada bonus semanal se cuenta el día en que se alcanzó (ej. el 3er cardio de la semana),
+// así la suma de todos los días es igual al total de la vista "leaderboard".
+export function dailyPoints(checks: ChecksByDate, bonuses: BonusEvent[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  const add = (d: string, n: number) => (out[d] = (out[d] ?? 0) + n);
+  for (const d in checks) if (checks[d].size) add(d, checks[d].size * POINTS_PER_HABIT);
+  for (const b of bonuses) add(b.date, b.points);
+  for (const monday of competitionWeeks()) {
+    for (const wb of WEEKLY_BONUSES) {
+      let n = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(monday, i);
+        if (checks[d]?.has(wb.habit) && ++n === wb.times) {
+          add(d, wb.points);
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
