@@ -15,7 +15,7 @@ export default function StatsPage() {
   const { user } = useAuth();
   const userId = user!.id;
   const today = todayMX();
-  const { checks, bonuses, loading, error, reload, markLocal } = useMyData(userId);
+  const { checks, pointEvents: bonuses, loading, error, reload, markLocal } = useMyData(userId);
   const [rankKey, setRankKey] = useState(0);
   const ranking = useRanking(userId, today, rankKey);
 

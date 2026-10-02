@@ -107,7 +107,12 @@ body {
   100% { transform: translate(-50%, -12px); opacity: 0; }
 }
 
+@keyframes deal-in {
+  from { transform: translate(48px, -64px) rotate(10deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
 .animate-fade { animation: fade-in 150ms ease-out; }
+.animate-deal { animation: deal-in 300ms ease-out; }
 .animate-check { animation: check-pop 200ms ease-out; }
 .animate-points { animation: points-rise 2200ms ease-out forwards; }
 /* Panel: sube desde abajo en celular; en computadora entra de lado o centrado */

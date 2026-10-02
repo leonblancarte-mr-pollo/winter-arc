@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { BookForm, HalfMarathonForm } from "@/components/calendar/BonusForms";
 import DaySheet from "@/components/calendar/DaySheet";
-import { ErrorBox, PointsBurst, Ring, Spinner, Wordmark } from "@/components/ui";
+import { ErrorBox, PointsBurst, Ring, Spinner, SyncBadge, Wordmark } from "@/components/ui";
 import { COMPETITION_END, COMPETITION_MONTHS, HABITS } from "@/lib/constants";
 import { daysInMonth, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
 import { countOn, currentStreak, totalPoints } from "@/lib/points";
@@ -20,7 +20,7 @@ export default function CalendarioPage() {
   const { user, profile, signOut } = useAuth();
   const userId = user!.id;
   const today = todayMX();
-  const { checks, bonuses, loading, error, setError, reload, toggle, addBonusLocal } = useMyData(userId);
+  const { checks, bonuses, pointEvents, loading, error, setError, reload, toggle, addBonusLocal, pendingCount } = useMyData(userId);
 
   // Mes inicial: el mes actual si está dentro de la carrera
   const initialIdx = Math.max(
@@ -33,7 +33,7 @@ export default function CalendarioPage() {
   const [burst, setBurst] = useState<number | null>(null);
   const clearBurst = useCallback(() => setBurst(null), []);
 
-  const pts = useMemo(() => totalPoints(checks, bonuses), [checks, bonuses]);
+  const pts = useMemo(() => totalPoints(checks, pointEvents), [checks, pointEvents]);
   const streak = useMemo(() => currentStreak(checks, today), [checks, today]);
 
   const { year, month } = COMPETITION_MONTHS[monthIdx];
@@ -60,11 +60,14 @@ export default function CalendarioPage() {
 
   return (
     <main className="mx-auto max-w-xl">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-3">
         <Wordmark />
-        <button onClick={signOut} className="icon-btn" aria-label="Cerrar sesión" title="Cerrar sesión">
-          <LogOut size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          <SyncBadge count={pendingCount} />
+          <button onClick={signOut} className="icon-btn" aria-label="Cerrar sesión" title="Cerrar sesión">
+            <LogOut size={16} />
+          </button>
+        </div>
       </header>
 
       {/* Resumen */}

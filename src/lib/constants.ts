@@ -16,7 +16,7 @@ export const COMPETITION_MONTHS = [
   { year: 2026, month: 12 },
 ];
 
-// Los 8 hábitos (el máximo diario es HABITS.length). "key" es lo que se guarda en la base de datos: no lo cambies
+// Los 9 hábitos (el máximo diario es HABITS.length). "key" es lo que se guarda en la base de datos: no lo cambies
 // una vez que la carrera empezó (perderías los hábitos ya marcados).
 export const HABITS = [
   { key: "gym", label: "Ir al gym", short: "Gym", icon: "Dumbbell" },
@@ -27,6 +27,7 @@ export const HABITS = [
   { key: "pantalla", label: "Menos de 5 hrs de tiempo en pantalla", short: "Pantalla", icon: "Smartphone" },
   { key: "proyecto", label: "1 hr de trabajo en proyecto personal", short: "Proyecto", icon: "Hammer" },
   { key: "no_pajiza", label: "No chaketa", short: "No chaketa", icon: "ShieldCheck" },
+  { key: "agua_3litros", label: "Tomar 3 litros de agua", short: "Agua", icon: "Droplet" },
 ] as const;
 
 export type HabitKey = (typeof HABITS)[number]["key"];
@@ -44,8 +45,8 @@ export const WEEKLY_BONUSES = [
   { habit: "gym" as HabitKey, times: 5, points: 5, label: "5 días de gym en la semana" },
 ];
 
-// Mínimo de hábitos al día para que cuente en la racha (6 de 8)
-export const STREAK_MIN_HABITS = 6;
+// Mínimo de hábitos al día para que cuente en la racha (7 de 9)
+export const STREAK_MIN_HABITS = 7;
 
 // Tipos de actividad manual
 export const ACTIVITY_TYPES = [

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { COMPETITION_END, COMPETITION_START } from "./constants";
 import { addDays, dateRange } from "./dates";
 import { dailyPoints, groupChecks } from "./points";
+import { fetchSpentPoints } from "./spentPoints";
 import { errorES, fetchAll, supabase } from "./supabase";
 import type { BonusEvent, HabitCheck, LeaderboardRow } from "./types";
 
@@ -32,7 +33,7 @@ export function useRanking(userId: string, today: string, refreshKey: number) {
 
       // Historial de todos (hábitos y bonus de la carrera) para la gráfica
       try {
-        const [checks, bonus] = await Promise.all([
+        const [checks, bonus, spent] = await Promise.all([
           fetchAll<HabitCheck>((f, t) =>
             supabase
               .from("habit_checks")
@@ -45,6 +46,7 @@ export function useRanking(userId: string, today: string, refreshKey: number) {
           fetchAll<BonusEvent>((f, t) =>
             supabase.from("bonus_events").select("*").gte("date", COMPETITION_START).lte("date", COMPETITION_END).order("id").range(f, t),
           ),
+          fetchSpentPoints(),
         ]);
         if (!alive) return;
 
@@ -54,7 +56,7 @@ export function useRanking(userId: string, today: string, refreshKey: number) {
             r.user_id,
             dailyPoints(
               groupChecks(checks.filter((c) => c.user_id === r.user_id)),
-              bonus.filter((b) => b.user_id === r.user_id),
+              [...bonus, ...spent].filter((b) => b.user_id === r.user_id),
             ),
           ]),
         );

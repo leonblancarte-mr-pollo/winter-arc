@@ -1,33 +1,42 @@
 "use client";
 // PANTALLA 3: Chat grupal en tiempo real
-import { SendHorizontal } from "lucide-react";
+import { ImagePlay, SendHorizontal } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import GifPicker from "@/components/chat/GifPicker";
+import UserAvatar from "@/components/UserAvatar";
 import { ErrorBox, Spinner } from "@/components/ui";
 import { dateInMX, longLabel, timeInMX, todayMX } from "@/lib/dates";
+import { gifUrlFrom, toGifMessage } from "@/lib/gifs";
 import { errorES, supabase } from "@/lib/supabase";
-import type { Message } from "@/lib/types";
+import type { AvatarOverride, Message } from "@/lib/types";
 
 const LIMIT = 100;
+
+type Person = { name: string; avatar: AvatarOverride };
 
 export default function ChatPage() {
   const { user } = useAuth();
   const userId = user!.id;
   const [messages, setMessages] = useState<Message[] | null>(null);
-  const [names, setNames] = useState<Record<string, string>>({});
+  const [people, setPeople] = useState<Record<string, Person>>({});
+  const [gifOpen, setGifOpen] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Nombres conocidos (para saber si hay que recargar perfiles al llegar un mensaje)
-  const namesRef = useRef(names);
+  const namesRef = useRef(people);
   useEffect(() => {
-    namesRef.current = names;
-  }, [names]);
+    namesRef.current = people;
+  }, [people]);
 
   const loadNames = useCallback(async () => {
-    const { data } = await supabase.from("profiles").select("id,display_name");
-    setNames(Object.fromEntries((data ?? []).map((p) => [p.id, p.display_name])));
+    // avatar_override existe después de correr casino.sql; si aún no, se piden solo los nombres
+    let { data, error } = await supabase.from("profiles").select("id,display_name,avatar_override");
+    if (error) ({ data, error } = await supabase.from("profiles").select("id,display_name"));
+    const rows = (data ?? []) as { id: string; display_name: string; avatar_override?: AvatarOverride }[];
+    setPeople(Object.fromEntries(rows.map((p) => [p.id, { name: p.display_name, avatar: p.avatar_override ?? null }])));
   }, []);
 
   // Agrega mensajes sin repetir y en orden
@@ -72,17 +81,30 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
-  async function send(e?: React.FormEvent) {
-    e?.preventDefault();
-    const content = text.trim();
-    if (!content || sending) return;
+  // Guarda un mensaje (texto o GIF) en Supabase; el resto lo recibe en tiempo real
+  async function post(content: string) {
     setSending(true);
     setError(null);
     const { data, error } = await supabase.from("messages").insert({ user_id: userId, content }).select().single();
     setSending(false);
-    if (error) return setError(`No se envió: ${errorES(error.message)}`);
-    setText("");
+    if (error) {
+      setError(`No se envió: ${errorES(error.message)}`);
+      return false;
+    }
     merge([data as Message]);
+    return true;
+  }
+
+  async function send(e?: React.FormEvent) {
+    e?.preventDefault();
+    const content = text.trim();
+    if (!content || sending) return;
+    if (await post(content)) setText("");
+  }
+
+  async function sendGif(url: string) {
+    setGifOpen(false);
+    await post(toGifMessage(url));
   }
 
   const today = todayMX();
@@ -105,7 +127,9 @@ export default function ChatPage() {
             const newDay = !prev || dateInMX(prev.created_at) !== day;
             const firstOfGroup = newDay || prev.user_id !== m.user_id;
             const lastOfGroup = !next || next.user_id !== m.user_id || dateInMX(next.created_at) !== day;
-            const name = names[m.user_id] ?? "";
+            const person = people[m.user_id];
+            const name = person?.name ?? "";
+            const gif = gifUrlFrom(m.content);
             return (
               <div key={m.id}>
                 {newDay && (
@@ -116,18 +140,29 @@ export default function ChatPage() {
                 <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"} ${firstOfGroup ? "mt-4" : "mt-1"}`}>
                   {!mine && (
                     <div className="w-7 shrink-0">
-                      {lastOfGroup && <Avatar name={name} />}
+                      {lastOfGroup && <UserAvatar name={name} override={person?.avatar} />}
                     </div>
                   )}
                   <div className={`flex max-w-[80%] flex-col ${mine ? "items-end" : "items-start"}`}>
                     {!mine && firstOfGroup && <span className="mb-1 px-1 text-xs font-medium text-fg2">{name}</span>}
-                    <div
-                      className={`whitespace-pre-wrap break-words rounded-xl px-3 py-2 ${
-                        mine ? "bg-sky-400/15 text-sky-200" : "bg-zinc-900 text-white"
-                      }`}
-                    >
-                      {m.content}
-                    </div>
+                    {gif ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={gif}
+                        alt="GIF"
+                        loading="lazy"
+                        className="block h-auto w-full max-w-[250px] rounded-xl bg-zinc-900"
+                        style={{ minWidth: 120 }}
+                      />
+                    ) : (
+                      <div
+                        className={`whitespace-pre-wrap break-words rounded-xl px-3 py-2 ${
+                          mine ? "bg-sky-400/15 text-sky-200" : "bg-zinc-900 text-white"
+                        }`}
+                      >
+                        {m.content}
+                      </div>
+                    )}
                     {lastOfGroup && <span className="mt-1 px-1 text-[11px] tabular-nums text-zinc-600">{timeInMX(m.created_at)}</span>}
                   </div>
                 </div>
@@ -149,6 +184,16 @@ export default function ChatPage() {
           </div>
         )}
         <div className="mx-auto flex max-w-2xl gap-2">
+          <button
+            type="button"
+            onClick={() => setGifOpen(true)}
+            disabled={sending}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-field text-fg2 transition-colors duration-150 ease-out hover:text-fg disabled:opacity-30"
+            aria-label="Enviar un GIF"
+            title="Enviar un GIF"
+          >
+            <ImagePlay size={16} />
+          </button>
           <input
             className="input flex-1 py-2"
             placeholder="Escribe un mensaje"
@@ -173,22 +218,7 @@ export default function ChatPage() {
           </button>
         </div>
       </form>
+      <GifPicker open={gifOpen} onClose={() => setGifOpen(false)} onPick={sendGif} />
     </main>
-  );
-}
-
-// Círculo con las iniciales del nombre
-function Avatar({ name }: { name: string }) {
-  const initials =
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((w) => w[0]?.toUpperCase() ?? "")
-      .join("") || "?";
-  return (
-    <div className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-raised text-[11px] font-medium text-fg2" aria-hidden>
-      {initials}
-    </div>
   );
 }

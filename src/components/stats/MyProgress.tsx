@@ -15,11 +15,12 @@ import {
   pointsOn,
   totalPoints,
   type ChecksByDate,
+  type PointEvent,
 } from "@/lib/points";
-import type { BonusEvent } from "@/lib/types";
+
 import { axisProps, gridStroke, tooltipStyle } from "./chartTheme";
 
-type Props = { checks: ChecksByDate; bonuses: BonusEvent[]; today: string };
+type Props = { checks: ChecksByDate; bonuses: PointEvent[]; today: string };
 
 // ---------- Fila superior: puntos, racha y posición con tendencia ----------
 export function SummaryCards({

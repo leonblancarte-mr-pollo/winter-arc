@@ -1,6 +1,6 @@
 "use client";
 // Piezas de interfaz reutilizables
-import { Loader2, Minus, TrendingDown, TrendingUp, X } from "lucide-react";
+import { Loader2, Minus, RefreshCw, TrendingDown, TrendingUp, X } from "lucide-react";
 import { useEffect } from "react";
 
 // Logo: wordmark "WINTER ARC" en la fuente editorial
@@ -173,6 +173,18 @@ export function SectionTitle({ children, right, id }: { children: React.ReactNod
 }
 
 // Leyenda de gráficas en HTML (evita que Recharts mida y re-mida su leyenda)
+// Insignia que avisa cuando hay cambios guardados en el celular pero aún no subidos
+// (sin internet, o subiéndolos en este momento).
+export function SyncBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-raised px-2.5 py-1 text-xs text-fg2" role="status">
+      <RefreshCw size={12} className="animate-spin text-accent" />
+      Sincronizando{count > 1 ? ` (${count})` : ""}
+    </span>
+  );
+}
+
 export function ChartLegend({ items }: { items: { label: string; color: string }[] }) {
   return (
     <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-fg2">

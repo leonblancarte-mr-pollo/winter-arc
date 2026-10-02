@@ -2,11 +2,11 @@
 // Ranking de la carrera: puntos acumulados día a día, una línea por usuario
 import { Crown } from "lucide-react";
 import { useState } from "react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, usePlotArea, useXAxisScale, useYAxisScale, XAxis, YAxis } from "recharts";
 import { ErrorBox, Spinner } from "@/components/ui";
 import { CHART_COLORS } from "@/lib/constants";
 import { longLabel, shortLabel } from "@/lib/dates";
-import type { LeaderboardRow } from "@/lib/types";
+import type { AvatarOverride, LeaderboardRow } from "@/lib/types";
 import type { ProgressRow } from "@/lib/useRanking";
 import { axisProps, gridStroke } from "./chartTheme";
 
@@ -53,6 +53,9 @@ export default function Ranking({
   const last = rows.length - 1;
   const colors = assignColors(rows, userId);
   const names = Object.fromEntries(rows.map((r) => [r.user_id, r.display_name]));
+  const avatars = Object.fromEntries(rows.map((r) => [r.user_id, r.avatar_override ?? null]));
+  // Último día con datos (hoy, o el 31 de diciembre si ya terminó la carrera)
+  const lastRow = progress ? [...progress].reverse().find((p) => rows.some((r) => p[r.user_id] != null)) : undefined;
   // Mi línea se dibuja al final para quedar encima
   const drawOrder = [...rows.filter((r) => r.user_id !== userId), ...rows.filter((r) => r.user_id === userId)];
 
@@ -74,7 +77,7 @@ export default function Ranking({
         <p className="py-8 text-center text-fg3">No se pudo cargar la progresión de puntos.</p>
       ) : (
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={progress} margin={{ left: -16, right: 24, top: 8 }}>
+          <LineChart data={progress} margin={{ left: -16, right: 24, top: 12 }}>
             <CartesianGrid stroke={gridStroke} vertical={false} />
             <XAxis dataKey="date" {...axisProps} ticks={X_TICKS} tickFormatter={shortLabel} interval={0} minTickGap={8} />
             <YAxis {...axisProps} allowDecimals={false} width={48} />
@@ -100,6 +103,7 @@ export default function Ranking({
                 />
               );
             })}
+            {lastRow && <EndLabels row={lastRow} rows={drawOrder} colors={colors} names={names} avatars={avatars} userId={userId} focus={focus} />}
           </LineChart>
         </ResponsiveContainer>
       )}
@@ -123,7 +127,10 @@ export default function Ranking({
               >
                 <span className="tabular-nums text-fg3">{i + 1}</span>
                 <span className="h-2 w-2 rounded-full" style={{ background: colors[r.user_id] }} />
-                <span className={mine ? "font-semibold text-fg" : "text-fg"}>{r.display_name}</span>
+                <span className={mine ? "font-semibold text-fg" : "text-fg"}>
+                  {r.avatar_override === "burro" ? "🫏 " : ""}
+                  {r.display_name}
+                </span>
                 {i === 0 && <Crown size={12} className="text-accent" aria-label="Líder" />}
                 <span className="tabular-nums text-fg2">{r.total_points}</span>
                 {i === last && rows.length > 1 && <span className="text-[10px] uppercase tracking-[0.05em] text-fg3">Último</span>}
@@ -174,5 +181,93 @@ function ProgressTooltip({
         })}
       </ul>
     </div>
+  );
+}
+
+// Etiquetas fijas al final de cada línea (nombre + puntos), sin necesidad de pasar el cursor.
+// Si dos quedan muy cerca, se separan verticalmente y una línea guía las une a su punto.
+const LABEL_GAP = 14; // px mínimos entre etiquetas
+const LABEL_SPACE = 120; // px que necesita una etiqueta a la derecha del punto
+
+function EndLabels({
+  row,
+  rows,
+  colors,
+  names,
+  avatars,
+  userId,
+  focus,
+}: {
+  row: ProgressRow;
+  rows: LeaderboardRow[];
+  colors: Record<string, string>;
+  names: Record<string, string>;
+  avatars: Record<string, AvatarOverride>;
+  userId: string;
+  focus: string | null;
+}) {
+  const xScale = useXAxisScale();
+  const yScale = useYAxisScale();
+  const plot = usePlotArea();
+  if (!xScale || !yScale || !plot) return null;
+
+  const x = xScale(row.date);
+  if (x == null) return null;
+  // Si el punto está cerca del borde derecho, la etiqueta va a su izquierda
+  const toLeft = x + LABEL_SPACE > plot.x + plot.width + 24;
+
+  // Posición real del último punto de cada línea, de arriba hacia abajo
+  const items = rows
+    .map((r) => {
+      const value = Number(row[r.user_id] ?? 0);
+      const y = yScale(value) ?? 0;
+      return { id: r.user_id, value, pointY: y, labelY: y };
+    })
+    .sort((a, b) => a.pointY - b.pointY);
+
+  // 1) De arriba hacia abajo: empuja hacia abajo las que se enciman
+  for (let i = 1; i < items.length; i++) {
+    items[i].labelY = Math.max(items[i].labelY, items[i - 1].labelY + LABEL_GAP);
+  }
+  // 2) De abajo hacia arriba: que ninguna se salga por abajo de la gráfica
+  const bottom = plot.y + plot.height;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const max = i === items.length - 1 ? bottom : items[i + 1].labelY - LABEL_GAP;
+    items[i].labelY = Math.min(items[i].labelY, max);
+  }
+
+  const dx = toLeft ? -8 : 8;
+  return (
+    <g pointerEvents="none">
+      {items.map((it) => {
+        const color = colors[it.id];
+        const dimmed = focus != null && focus !== it.id;
+        const mine = it.id === userId;
+        const raw = names[it.id] ?? "";
+        const name = raw.length > 10 ? raw.slice(0, 9) + "…" : raw;
+        const moved = Math.abs(it.labelY - it.pointY) > 1;
+        return (
+          <g key={it.id} opacity={dimmed ? 0.15 : 1}>
+            <circle cx={x} cy={it.pointY} r={mine ? 4 : 3} fill={color} />
+            {moved && <line x1={x} y1={it.pointY} x2={x + dx * 0.75} y2={it.labelY} stroke={color} strokeWidth={1} strokeOpacity={0.6} />}
+            <text
+              x={x + dx}
+              y={it.labelY}
+              dy="0.35em"
+              textAnchor={toLeft ? "end" : "start"}
+              fontSize={11}
+              fontWeight={mine ? 600 : 500}
+              fill={color}
+              stroke="#0a0a0a"
+              strokeWidth={3}
+              paintOrder="stroke"
+            >
+              {avatars[it.id] === "burro" ? "🫏 " : ""}
+              {name} {it.value}
+            </text>
+          </g>
+        );
+      })}
+    </g>
   );
 }
