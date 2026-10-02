@@ -5,9 +5,6 @@ import { Chess, type Square } from "chess.js";
 import { useMemo, useState } from "react";
 import { Sheet } from "@/components/ui";
 
-// Mismo dibujo para los dos colores; el color se pone con CSS.
-// "︎" fuerza a que se vea como texto y no como emoji (sobre todo en iPhone).
-const GLYPH: Record<string, string> = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const PROMOTIONS = [
   { p: "q", name: "Dama" },
@@ -18,20 +15,34 @@ const PROMOTIONS = [
 
 export type BoardMove = { from: string; to: string; promotion?: string };
 
-function Piece({ type, color, size = "text-[min(9vw,42px)]" }: { type: string; color: "w" | "b"; size?: string }) {
+// Piezas dibujadas como SVG: se ven igual en todos los celulares (los símbolos Unicode
+// cambian de color o se vuelven emoji según el sistema). Un mismo dibujo para los dos colores.
+const PIECE_PATHS: Record<string, string[]> = {
+  p: ["M50 18a11 11 0 0 1 6 20.3C64 43 66 52 64 60h8v10H28V60h8c-2-8 0-17 8-21.7A11 11 0 0 1 50 18Z", "M24 70h52v12H24z"],
+  r: ["M28 82V72h6l2-28h-6V22h10v6h6v-6h8v6h6v-6h10v22h-6l2 28h6v10Z"],
+  n: ["M28 82V72c0-14 8-18 13-27-6 0-10 2-14 6l-6-3c2-8 8-16 16-22l2-8 7 5c13-1 27 9 27 31v24Z"],
+  b: ["M50 12a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z", "M50 26c10 8 14 18 8 28l4 6-6 2 4 8h6v12H34V70h6l4-8-6-2 4-6c-6-10-2-20 8-28Z"],
+  q: ["M24 82V72l6-2-8-38 16 20 4-26 8 24 8-24 4 26 16-20-8 38 6 2v10Z", "M22 28a5 5 0 1 0 0 .1ZM42 20a5 5 0 1 0 0 .1ZM58 20a5 5 0 1 0 0 .1ZM78 28a5 5 0 1 0 0 .1ZM50 14a5 5 0 1 0 0 .1Z"],
+  k: ["M46 8h8v8h8v8h-8v8h-8v-8h-8v-8h8Z", "M50 34c16 0 22 12 16 24l4 12 4 2v10H26V72l4-2 4-12c-6-12 0-24 16-24Z"],
+};
+
+function Piece({ type, color, size = "h-full w-full" }: { type: string; color: "w" | "b"; size?: string }) {
+  const white = color === "w";
   return (
-    <span
-      className={`select-none leading-none ${size}`}
-      style={
-        color === "w"
-          ? { color: "#fafafa", WebkitTextStroke: "1px #18181b", textShadow: "0 1px 1px rgba(0,0,0,0.5)" }
-          : { color: "#0a0a0a", WebkitTextStroke: "0.6px #a1a1aa" }
-      }
-      aria-hidden
-    >
-      {GLYPH[type]}
-      {"︎"}
-    </span>
+    <svg viewBox="12 6 76 76" className={`select-none ${size}`} aria-hidden>
+      <g
+        fill={white ? "#ffffff" : "#111827"}
+        stroke={white ? "#0f172a" : "#e2e8f0"}
+        strokeWidth={white ? 3.5 : 2.5}
+        strokeLinejoin="round"
+        style={{ filter: "drop-shadow(0 1.5px 1px rgba(0,0,0,0.35))" }}
+      >
+        {PIECE_PATHS[type].map((d, i) => (
+          <path key={i} d={d} />
+        ))}
+        {type === "n" && <circle cx="50" cy="32" r="2.5" fill={white ? "#0f172a" : "#e2e8f0"} stroke="none" />}
+      </g>
+    </svg>
   );
 }
 
@@ -93,7 +104,7 @@ export default function ChessBoard({
 
   return (
     <>
-      <div className="mx-auto grid aspect-square w-full max-w-[480px] grid-cols-8 overflow-hidden rounded-lg border border-line" role="grid" aria-label="Tablero de ajedrez">
+      <div className="mx-auto grid aspect-square w-full max-w-[480px] grid-cols-8 grid-rows-8 overflow-hidden rounded-lg border border-line" role="grid" aria-label="Tablero de ajedrez">
         {ranks.map((rank, ri) =>
           files.map((file, fi) => {
             const square = `${file}${rank}` as Square;
@@ -107,14 +118,14 @@ export default function ChessBoard({
                 type="button"
                 onClick={() => tap(square)}
                 aria-label={`${square}${piece ? `, ${piece.color === "w" ? "blanca" : "negra"}` : ""}`}
-                className={`relative flex items-center justify-center ${interactive ? "cursor-pointer" : "cursor-default"}`}
+                className={`relative flex min-h-0 min-w-0 items-center justify-center overflow-hidden ${interactive ? "cursor-pointer" : "cursor-default"}`}
                 style={{ background: dark ? "#64748b" : "#cbd5e1" }}
               >
                 {isLast && <span className="absolute inset-0 bg-sky-300/35" />}
                 {square === checkSquare && <span className="absolute inset-0 bg-[radial-gradient(circle,rgba(248,113,113,0.95)_0%,rgba(248,113,113,0.35)_60%,transparent_75%)]" />}
                 {square === selected && <span className="absolute inset-0 ring-4 ring-inset ring-accent" />}
                 {piece && (
-                  <span className="relative">
+                  <span className="relative h-[86%] w-[86%]">
                     <Piece type={piece.type} color={piece.color} />
                   </span>
                 )}
@@ -143,7 +154,7 @@ export default function ChessBoard({
                 setPromo(null);
               }}
             >
-              <Piece type={o.p} color={turn} size="text-5xl" />
+              <Piece type={o.p} color={turn} size="h-14 w-14" />
               <span className="text-xs font-medium text-zinc-900">{o.name}</span>
             </button>
           ))}
