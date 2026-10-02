@@ -1,6 +1,6 @@
 "use client";
 // PANTALLA 3: Chat grupal en tiempo real
-import { ImagePlay, SendHorizontal } from "lucide-react";
+import { Footprints, ImagePlay, PartyPopper, SendHorizontal, Trophy } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import GifPicker from "@/components/chat/GifPicker";
@@ -11,7 +11,18 @@ import { gifUrlFrom, toGifMessage } from "@/lib/gifs";
 import { errorES, supabase } from "@/lib/supabase";
 import type { AvatarOverride, Message } from "@/lib/types";
 
+// Últimos mensajes de personas que se cargan; los anuncios del sistema se piden aparte
+// para que nunca desplacen los mensajes reales.
 const LIMIT = 100;
+const SYSTEM_LIMIT = 40;
+
+// Ícono de cada tipo de anuncio (el texto del mensaje empieza con su emoji)
+const SYSTEM_ICONS: Partial<Record<string, typeof Trophy>> = { "🏆": Trophy, "🏃": Footprints, "🎉": PartyPopper };
+function systemParts(content: string) {
+  const [emoji] = [...content];
+  const Icon = SYSTEM_ICONS[emoji];
+  return Icon ? { Icon, text: content.slice(emoji.length).trim() } : { Icon: Trophy, text: content };
+}
 
 type Person = { name: string; avatar: AvatarOverride };
 
@@ -52,15 +63,19 @@ export default function ChatPage() {
     // Carga datos de Supabase al abrir la pantalla (los setState ocurren después de la respuesta)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadNames();
-    supabase
-      .from("messages")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(LIMIT)
-      .then(({ data, error }) => {
+    (async () => {
+      const recent = (system: boolean, limit: number) =>
+        supabase.from("messages").select("*").eq("is_system", system).order("created_at", { ascending: false }).limit(limit);
+      const [people, announcements] = await Promise.all([recent(false, LIMIT), recent(true, SYSTEM_LIMIT)]);
+      if (people.error) {
+        // Sin la columna is_system (aún no se corrió anuncios_chat.sql): carga todo junto como antes
+        const { data, error } = await supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(LIMIT);
         if (error) return setError(errorES(error.message));
-        setMessages([...(data ?? [])].reverse() as Message[]);
-      });
+        return setMessages([...(data ?? [])].reverse() as Message[]);
+      }
+      const all = [...(people.data ?? []), ...(announcements.data ?? [])] as Message[];
+      setMessages(all.sort((a, b) => a.id - b.id));
+    })();
 
     // Escucha mensajes nuevos en tiempo real
     const channel = supabase
@@ -125,8 +140,9 @@ export default function ChatPage() {
             const prev = messages[i - 1];
             const next = messages[i + 1];
             const newDay = !prev || dateInMX(prev.created_at) !== day;
-            const firstOfGroup = newDay || prev.user_id !== m.user_id;
-            const lastOfGroup = !next || next.user_id !== m.user_id || dateInMX(next.created_at) !== day;
+            // Un anuncio del sistema corta los grupos de mensajes de una misma persona
+            const firstOfGroup = newDay || prev.user_id !== m.user_id || !!prev.is_system || !!m.is_system;
+            const lastOfGroup = !next || next.user_id !== m.user_id || !!next.is_system || !!m.is_system || dateInMX(next.created_at) !== day;
             const person = people[m.user_id];
             const name = person?.name ?? "";
             const gif = gifUrlFrom(m.content);
@@ -137,6 +153,9 @@ export default function ChatPage() {
                     {day === today ? "Hoy" : <span className="inline-block first-letter:uppercase">{longLabel(day)}</span>}
                   </div>
                 )}
+                {m.is_system ? (
+                  <SystemMessage content={m.content} time={timeInMX(m.created_at)} />
+                ) : (
                 <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"} ${firstOfGroup ? "mt-4" : "mt-1"}`}>
                   {!mine && (
                     <div className="w-7 shrink-0">
@@ -166,6 +185,7 @@ export default function ChatPage() {
                     {lastOfGroup && <span className="mt-1 px-1 text-[11px] tabular-nums text-zinc-600">{timeInMX(m.created_at)}</span>}
                   </div>
                 </div>
+                )}
               </div>
             );
           })
@@ -220,5 +240,21 @@ export default function ChatPage() {
       </form>
       <GifPicker open={gifOpen} onClose={() => setGifOpen(false)} onPick={sendGif} />
     </main>
+  );
+}
+
+// Anuncio automático: centrado, con ícono y sin burbuja de persona (no se puede reaccionar ni borrar)
+function SystemMessage({ content, time }: { content: string; time: string }) {
+  const { Icon, text } = systemParts(content);
+  return (
+    <div className="my-4 flex justify-center px-2">
+      <div className="flex max-w-[92%] items-start gap-3 rounded-xl border border-accent/15 bg-accent/[0.06] px-3 py-2 text-sm text-fg2">
+        <Icon size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+        <div className="min-w-0">
+          <p className="whitespace-pre-wrap break-words">{text}</p>
+          <span className="text-[11px] tabular-nums text-fg3">{time}</span>
+        </div>
+      </div>
+    </div>
   );
 }

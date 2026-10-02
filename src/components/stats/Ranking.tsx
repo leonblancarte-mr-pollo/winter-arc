@@ -1,6 +1,7 @@
 "use client";
 // Ranking de la carrera: puntos acumulados día a día, una línea por usuario
 import { Crown } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, usePlotArea, useXAxisScale, useYAxisScale, XAxis, YAxis } from "recharts";
 import { ErrorBox, Spinner } from "@/components/ui";
@@ -54,6 +55,15 @@ export default function Ranking({
   const colors = assignColors(rows, userId);
   const names = Object.fromEntries(rows.map((r) => [r.user_id, r.display_name]));
   const avatars = Object.fromEntries(rows.map((r) => [r.user_id, r.avatar_override ?? null]));
+  // Marcas del eje X: solo hasta el último día mostrado, que siempre lleva su marca
+  const lastDate = progress?.[progress.length - 1]?.date;
+  const xTicks = lastDate ? X_TICKS.filter((d) => d <= lastDate) : X_TICKS;
+  if (lastDate && !xTicks.includes(lastDate)) {
+    const prevTick = xTicks[xTicks.length - 1];
+    // Si la última marca fija queda muy cerca de hoy, se cede su lugar a la de hoy
+    if (prevTick && (new Date(lastDate).getTime() - new Date(prevTick).getTime()) / 86400000 < 4) xTicks.pop();
+    xTicks.push(lastDate);
+  }
   // Último día con datos (hoy, o el 31 de diciembre si ya terminó la carrera)
   const lastRow = progress ? [...progress].reverse().find((p) => rows.some((r) => p[r.user_id] != null)) : undefined;
   // Mi línea se dibuja al final para quedar encima
@@ -79,7 +89,7 @@ export default function Ranking({
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={progress} margin={{ left: -16, right: 24, top: 12 }}>
             <CartesianGrid stroke={gridStroke} vertical={false} />
-            <XAxis dataKey="date" {...axisProps} ticks={X_TICKS} tickFormatter={shortLabel} interval={0} minTickGap={8} />
+            <XAxis dataKey="date" {...axisProps} ticks={xTicks} tickFormatter={shortLabel} interval={0} minTickGap={8} />
             <YAxis {...axisProps} allowDecimals={false} width={48} />
             <Tooltip
               content={(p) => <ProgressTooltip active={p.active} payload={p.payload} names={names} colors={colors} userId={userId} />}
@@ -115,26 +125,36 @@ export default function Ranking({
           const active = focus === r.user_id;
           return (
             <li key={r.user_id}>
-              <button
-                type="button"
-                onClick={() => setFocus(active ? null : r.user_id)}
+              {/* El número y el punto resaltan la línea; el nombre abre el perfil */}
+              <div
                 onMouseEnter={() => setFocus(r.user_id)}
                 onMouseLeave={() => setFocus(null)}
-                aria-pressed={active}
                 className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors duration-150 ease-out hover:bg-white/[0.04] ${
                   mine ? "border-accent/30 bg-white/[0.06]" : "border-line"
                 }`}
               >
-                <span className="tabular-nums text-fg3">{i + 1}</span>
-                <span className="h-2 w-2 rounded-full" style={{ background: colors[r.user_id] }} />
-                <span className={mine ? "font-semibold text-fg" : "text-fg"}>
+                <button
+                  type="button"
+                  onClick={() => setFocus(active ? null : r.user_id)}
+                  aria-pressed={active}
+                  aria-label={`Resaltar la línea de ${r.display_name}`}
+                  className="flex items-center gap-2"
+                >
+                  <span className="tabular-nums text-fg3">{i + 1}</span>
+                  <span className="h-2 w-2 rounded-full" style={{ background: colors[r.user_id] }} />
+                </button>
+                <Link
+                  href={`/perfil/${r.user_id}`}
+                  title={`Ver perfil de ${r.display_name}`}
+                  className={`underline decoration-white/20 underline-offset-2 hover:decoration-white/60 ${mine ? "font-semibold text-fg" : "text-fg"}`}
+                >
                   {r.avatar_override === "burro" ? "🫏 " : ""}
                   {r.display_name}
-                </span>
+                </Link>
                 {i === 0 && <Crown size={12} className="text-accent" aria-label="Líder" />}
                 <span className="tabular-nums text-fg2">{r.total_points}</span>
                 {i === last && rows.length > 1 && <span className="text-[10px] uppercase tracking-[0.05em] text-fg3">Último</span>}
-              </button>
+              </div>
             </li>
           );
         })}

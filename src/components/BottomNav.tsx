@@ -24,7 +24,8 @@ export default function BottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-black/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
       <ul className="mx-auto grid max-w-lg grid-cols-5">
         {TABS.map(({ href, label, Icon }) => {
-          const active = path.startsWith(href);
+          // Los perfiles públicos se abren desde el ranking, así que cuentan como Stats
+          const active = path.startsWith(href) || (href === "/stats" && path.startsWith("/perfil"));
           const badge = href === "/ajedrez" ? chessCount : 0;
           return (
             <li key={href}>

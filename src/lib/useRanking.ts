@@ -61,12 +61,12 @@ export function useRanking(userId: string, today: string, refreshKey: number) {
           ]),
         );
 
-        // Acumulado día a día. Los días futuros quedan vacíos (la línea termina en hoy).
-        const lastDay = today < COMPETITION_END ? today : COMPETITION_END;
+        // Acumulado día a día. El eje termina en hoy (o el último día de la carrera):
+        // la gráfica se alarga sola conforme pasan los días.
+        const lastDay = today > COMPETITION_END ? COMPETITION_END : today < COMPETITION_START ? COMPETITION_START : today;
         const running = new Map(current.map((r) => [r.user_id, 0]));
-        const series: ProgressRow[] = dateRange(COMPETITION_START, COMPETITION_END).map((date) => {
+        const series: ProgressRow[] = dateRange(COMPETITION_START, lastDay).map((date) => {
           const row: ProgressRow = { date };
-          if (date > lastDay) return row;
           for (const r of current) {
             const day = perUser.get(r.user_id)?.[date] ?? 0;
             const total = running.get(r.user_id)! + day;

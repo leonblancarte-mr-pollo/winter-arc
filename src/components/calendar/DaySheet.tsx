@@ -14,13 +14,16 @@ export default function DaySheet({
   onToggle,
   onClose,
   onOpenBonus,
+  readOnly = false,
 }: {
   date: string | null;
   today: string;
   checks: ChecksByDate;
   onToggle: (date: string, key: string, on: boolean) => void;
   onClose: () => void;
-  onOpenBonus: (type: "book" | "half") => void;
+  onOpenBonus?: (type: "book" | "half") => void;
+  // Perfil de otra persona: se ve qué marcó, pero no se puede tachar nada
+  readOnly?: boolean;
 }) {
   if (!date) return null;
   const isFuture = date > today;
@@ -46,7 +49,7 @@ export default function DaySheet({
         </div>
       }
     >
-      {isFuture && (
+      {isFuture && !readOnly && (
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-raised px-3 py-2 text-fg2">
           <Lock size={16} /> Podrás tacharlo cuando llegue el día.
         </div>
@@ -59,11 +62,11 @@ export default function DaySheet({
           return (
             <li key={h.key}>
               <button
-                disabled={isFuture}
+                disabled={isFuture || readOnly}
                 onClick={() => onToggle(date, h.key, !on)}
                 aria-pressed={on}
-                className={`group flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors duration-150 ease-out enabled:hover:bg-white/[0.04] disabled:cursor-not-allowed ${
-                  isFuture ? "opacity-40" : ""
+                className={`group flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors duration-150 ease-out enabled:hover:bg-white/[0.04] ${readOnly ? "disabled:cursor-default" : "disabled:cursor-not-allowed"} ${
+                  isFuture && !readOnly ? "opacity-40" : ""
                 }`}
               >
                 <HabitIcon
@@ -116,7 +119,7 @@ export default function DaySheet({
       </div>
 
       {/* Bonus especiales */}
-      {!isFuture && (
+      {!isFuture && !readOnly && onOpenBonus && (
         <div className="mt-6 grid grid-cols-2 gap-2">
           <BonusCard icon={<BookOpen size={16} />} label="Terminé un libro" points={BOOK_BONUS} onClick={() => onOpenBonus("book")} />
           <BonusCard icon={<Medal size={16} />} label="Corrí 21 km" points={HALF_MARATHON_BONUS} onClick={() => onOpenBonus("half")} />
