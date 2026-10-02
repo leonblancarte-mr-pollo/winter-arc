@@ -68,3 +68,6 @@ export const CHART_COLORS = {
   orange: "#fb923c",
   green: "#4ade80",
 };
+
+// Hábitos que piden una foto como evidencia al tacharlos HOY (ver supabase/evidencia_habitos.sql)
+export const PHOTO_HABITS: readonly string[] = ["gym", "cardio", "leer", "pasos", "pantalla"];

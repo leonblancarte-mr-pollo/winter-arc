@@ -104,7 +104,7 @@ export default function ChessBoard({
 
   return (
     <>
-      <div className="mx-auto grid aspect-square w-full max-w-[480px] grid-cols-8 grid-rows-8 overflow-hidden rounded-lg border border-line" role="grid" aria-label="Tablero de ajedrez">
+      <div className="relative mx-auto aspect-square w-full max-w-[480px] overflow-hidden rounded-lg border border-line" role="grid" aria-label="Tablero de ajedrez">
         {ranks.map((rank, ri) =>
           files.map((file, fi) => {
             const square = `${file}${rank}` as Square;
@@ -118,19 +118,21 @@ export default function ChessBoard({
                 type="button"
                 onClick={() => tap(square)}
                 aria-label={`${square}${piece ? `, ${piece.color === "w" ? "blanca" : "negra"}` : ""}`}
-                className={`relative flex min-h-0 min-w-0 items-center justify-center overflow-hidden ${interactive ? "cursor-pointer" : "cursor-default"}`}
-                style={{ background: dark ? "#64748b" : "#cbd5e1" }}
+                data-square={square}
+                className={`absolute overflow-hidden p-0 ${interactive ? "cursor-pointer" : "cursor-default"}`}
+                // Cada casilla se coloca con porcentajes fijos del tablero: ninguna pieza puede cambiar su tamaño
+                style={{ left: `${fi * 12.5}%`, top: `${ri * 12.5}%`, width: "12.5%", height: "12.5%", background: dark ? "#64748b" : "#cbd5e1" }}
               >
                 {isLast && <span className="absolute inset-0 bg-sky-300/35" />}
                 {square === checkSquare && <span className="absolute inset-0 bg-[radial-gradient(circle,rgba(248,113,113,0.95)_0%,rgba(248,113,113,0.35)_60%,transparent_75%)]" />}
                 {square === selected && <span className="absolute inset-0 ring-4 ring-inset ring-accent" />}
                 {piece && (
-                  <span className="relative h-[86%] w-[86%]">
+                  <span className="absolute inset-[7%]">
                     <Piece type={piece.type} color={piece.color} />
                   </span>
                 )}
                 {/* Casillas a donde puede moverse la pieza elegida */}
-                {t && !t.capture && <span className="absolute h-[28%] w-[28%] rounded-full bg-zinc-900/45" />}
+                {t && !t.capture && <span className="absolute left-1/2 top-1/2 h-[28%] w-[28%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-900/45" />}
                 {t && t.capture && <span className="absolute inset-[6%] rounded-full border-[5px] border-zinc-900/45" />}
                 {/* Coordenadas en el borde */}
                 {fi === 0 && <span className={`absolute left-0.5 top-0 text-[9px] font-semibold ${dark ? "text-slate-200" : "text-slate-600"}`}>{rank}</span>}

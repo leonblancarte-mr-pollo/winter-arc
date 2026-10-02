@@ -46,7 +46,7 @@ export type WorkoutSet = {
 };
 
 // is_system: anuncio automático (libro, medio maratón, cardio). Puede faltar si aún no se corrió anuncios_chat.sql
-export type Message = { id: number; user_id: string; content: string; created_at: string; is_system?: boolean };
+export type Message = { id: number; user_id: string; content: string; created_at: string; is_system?: boolean; photo_path?: string | null };
 
 export type LeaderboardRow = {
   user_id: string;

@@ -1,12 +1,13 @@
 "use client";
 // PANTALLA 3: Chat grupal en tiempo real
-import { Footprints, ImagePlay, PartyPopper, SendHorizontal, Trophy } from "lucide-react";
+import { BookOpen, Dumbbell, Footprints, ImagePlay, PartyPopper, SendHorizontal, Smartphone, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import GifPicker from "@/components/chat/GifPicker";
 import UserAvatar from "@/components/UserAvatar";
 import { ErrorBox, Spinner } from "@/components/ui";
 import { dateInMX, longLabel, timeInMX, todayMX } from "@/lib/dates";
+import { signedPhotoUrl } from "@/lib/evidence";
 import { gifUrlFrom, toGifMessage } from "@/lib/gifs";
 import { errorES, supabase } from "@/lib/supabase";
 import type { AvatarOverride, Message } from "@/lib/types";
@@ -17,7 +18,7 @@ const LIMIT = 100;
 const SYSTEM_LIMIT = 40;
 
 // Ícono de cada tipo de anuncio (el texto del mensaje empieza con su emoji)
-const SYSTEM_ICONS: Partial<Record<string, typeof Trophy>> = { "🏆": Trophy, "🏃": Footprints, "🎉": PartyPopper };
+const SYSTEM_ICONS: Partial<Record<string, typeof Trophy>> = { "🏆": Trophy, "🏃": Footprints, "🎉": PartyPopper, "💪": Dumbbell, "📖": BookOpen, "👣": Footprints, "📵": Smartphone };
 function systemParts(content: string) {
   const [emoji] = [...content];
   const Icon = SYSTEM_ICONS[emoji];
@@ -33,6 +34,8 @@ export default function ChatPage() {
   const [people, setPeople] = useState<Record<string, Person>>({});
   const [gifOpen, setGifOpen] = useState(false);
   const [text, setText] = useState("");
+  // Foto de evidencia abierta desde un anuncio ("Ver foto")
+  const [photo, setPhoto] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -154,7 +157,7 @@ export default function ChatPage() {
                   </div>
                 )}
                 {m.is_system ? (
-                  <SystemMessage content={m.content} time={timeInMX(m.created_at)} />
+                  <SystemMessage content={m.content} time={timeInMX(m.created_at)} photoPath={m.photo_path} onPhoto={setPhoto} onError={setError} />
                 ) : (
                 <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"} ${firstOfGroup ? "mt-4" : "mt-1"}`}>
                   {!mine && (
@@ -238,21 +241,54 @@ export default function ChatPage() {
           </button>
         </div>
       </form>
+      {photo && (
+        <div className="animate-fade fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setPhoto(null)} role="dialog" aria-label="Foto de evidencia">
+          <button className="icon-btn absolute right-4 top-4" aria-label="Cerrar" onClick={() => setPhoto(null)}>
+            <X size={16} />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photo} alt="Evidencia" className="max-h-[85dvh] max-w-full rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
       <GifPicker open={gifOpen} onClose={() => setGifOpen(false)} onPick={sendGif} />
     </main>
   );
 }
 
 // Anuncio automático: centrado, con ícono y sin burbuja de persona (no se puede reaccionar ni borrar)
-function SystemMessage({ content, time }: { content: string; time: string }) {
+function SystemMessage({
+  content,
+  time,
+  photoPath,
+  onPhoto,
+  onError,
+}: {
+  content: string;
+  time: string;
+  photoPath?: string | null;
+  onPhoto: (url: string) => void;
+  onError: (msg: string) => void;
+}) {
   const { Icon, text } = systemParts(content);
+  async function view() {
+    const url = await signedPhotoUrl(photoPath!);
+    if (url) onPhoto(url);
+    else onError("No se pudo abrir la foto.");
+  }
   return (
     <div className="my-4 flex justify-center px-2">
       <div className="flex max-w-[92%] items-start gap-3 rounded-xl border border-accent/15 bg-accent/[0.06] px-3 py-2 text-sm text-fg2">
         <Icon size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />
         <div className="min-w-0">
           <p className="whitespace-pre-wrap break-words">{text}</p>
-          <span className="text-[11px] tabular-nums text-fg3">{time}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] tabular-nums text-fg3">{time}</span>
+            {photoPath && (
+              <button type="button" onClick={view} className="text-xs font-medium text-accent underline underline-offset-2">
+                Ver foto
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

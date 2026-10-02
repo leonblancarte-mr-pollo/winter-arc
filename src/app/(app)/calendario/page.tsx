@@ -6,12 +6,14 @@ import { useAuth } from "@/components/AuthProvider";
 import { BookForm, HalfMarathonForm } from "@/components/calendar/BonusForms";
 import CustomHabitsSection from "@/components/calendar/CustomHabitsSection";
 import DaySheet from "@/components/calendar/DaySheet";
+import HabitPhotoModal from "@/components/calendar/HabitPhotoModal";
 import { ErrorBox, PointsBurst, Ring, Spinner, SyncBadge, Wordmark } from "@/components/ui";
-import { COMPETITION_END, COMPETITION_MONTHS, HABITS } from "@/lib/constants";
+import { COMPETITION_END, COMPETITION_MONTHS, HABITS, PHOTO_HABITS } from "@/lib/constants";
 import { daysInMonth, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
 import { countOn, currentStreak, totalPoints } from "@/lib/points";
 import { supabase } from "@/lib/supabase";
 import type { BonusEvent } from "@/lib/types";
+import { useDayPhotos, useEvidence } from "@/lib/evidence";
 import { useCustomHabits } from "@/lib/useCustomHabits";
 import { useMyData } from "@/lib/useMyData";
 
@@ -23,6 +25,7 @@ export default function CalendarioPage() {
   const userId = user!.id;
   const today = todayMX();
   const custom = useCustomHabits(userId);
+  const evidence = useEvidence(userId);
   const { checks, bonuses, pointEvents, loading, error, setError, reload, toggle, addBonusLocal, pendingCount } = useMyData(userId);
 
   // Mes inicial: el mes actual si está dentro de la carrera
@@ -33,8 +36,25 @@ export default function CalendarioPage() {
   const [monthIdx, setMonthIdx] = useState(today > COMPETITION_END ? COMPETITION_MONTHS.length - 1 : initialIdx);
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [form, setForm] = useState<{ type: "book" | "half"; day: string } | null>(null);
+  // Hábito de hoy que está esperando su foto para marcarse
+  const [photoFor, setPhotoFor] = useState<string | null>(null);
   const [burst, setBurst] = useState<number | null>(null);
   const clearBurst = useCallback(() => setBurst(null), []);
+
+  const dayPhotos = useDayPhotos(evidence.rows, openDay);
+
+  // Los hábitos con foto se marcan solo hoy y con evidencia; en días pasados se tachan como siempre.
+  // Al destachar uno con foto, se quita también la evidencia.
+  function onToggle(date: string, key: string, on: boolean) {
+    if (on && date === today && PHOTO_HABITS.includes(key)) return setPhotoFor(key);
+    if (!on) void evidence.remove(date, key);
+    toggle(date, key, on);
+  }
+
+  async function saveWithPhoto(key: string, file: File) {
+    await evidence.save(today, key, file);
+    toggle(today, key, true);
+  }
 
   const pts = useMemo(() => totalPoints(checks, pointEvents), [checks, pointEvents]);
   const streak = useMemo(() => currentStreak(checks, today), [checks, today]);
@@ -181,7 +201,8 @@ export default function CalendarioPage() {
         </section>
       )}
 
-      <DaySheet date={openDay} today={today} checks={checks} onToggle={toggle} onClose={() => setOpenDay(null)} onOpenBonus={openBonus}
+      <HabitPhotoModal key={photoFor ?? "none"} habitKey={photoFor} onClose={() => setPhotoFor(null)} onSave={saveWithPhoto} />
+      <DaySheet date={openDay} today={today} checks={checks} onToggle={onToggle} photos={dayPhotos} onClose={() => setOpenDay(null)} onOpenBonus={openBonus}
         extra={
           openDay && (
             <CustomHabitsSection

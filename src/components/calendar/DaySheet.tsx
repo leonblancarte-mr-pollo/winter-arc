@@ -16,6 +16,7 @@ export default function DaySheet({
   onOpenBonus,
   readOnly = false,
   extra,
+  photos,
 }: {
   date: string | null;
   today: string;
@@ -27,6 +28,8 @@ export default function DaySheet({
   readOnly?: boolean;
   // Contenido extra debajo de los hábitos oficiales (hábitos personales)
   extra?: React.ReactNode;
+  // Fotos de evidencia del día (hábito -> URL)
+  photos?: Record<string, string>;
 }) {
   if (!date) return null;
   const isFuture = date > today;
@@ -92,6 +95,12 @@ export default function DaySheet({
                   {on && <Check key="on" size={12} strokeWidth={3} className="animate-check" />}
                 </span>
               </button>
+              {photos?.[h.key] && (
+                <a href={photos[h.key]} target="_blank" rel="noreferrer" className="mb-2 ml-9 block w-fit">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photos[h.key]} alt={`Evidencia: ${h.short}`} loading="lazy" className="h-24 w-auto max-w-full rounded-lg bg-zinc-900 object-cover" />
+                </a>
+              )}
             </li>
           );
         })}

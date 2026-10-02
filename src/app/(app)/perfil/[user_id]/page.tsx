@@ -10,6 +10,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { ErrorBox, Ring, SectionTitle, Spinner } from "@/components/ui";
 import { ACTIVITY_TYPES, COMPETITION_END, COMPETITION_MONTHS, COMPETITION_START, HABITS } from "@/lib/constants";
 import { daysInMonth, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
+import { useDayPhotos, useEvidence } from "@/lib/evidence";
 import { loadPeople, type Person } from "@/lib/people";
 import { countOn, currentStreak, groupChecks, type ChecksByDate } from "@/lib/points";
 import { errorES, fetchAll, supabase } from "@/lib/supabase";
@@ -43,6 +44,8 @@ export default function PerfilPage() {
   );
   const [monthIdx, setMonthIdx] = useState(today > COMPETITION_END ? COMPETITION_MONTHS.length - 1 : initialIdx);
   const [openDay, setOpenDay] = useState<string | null>(null);
+  const evidence = useEvidence(profileId);
+  const dayPhotos = useDayPhotos(evidence.rows, openDay);
 
   useEffect(() => {
     let alive = true;
@@ -303,7 +306,7 @@ export default function PerfilPage() {
         </ul>
       )}
 
-      <DaySheet date={openDay} today={today} checks={checks} onToggle={() => {}} onClose={() => setOpenDay(null)} readOnly />
+      <DaySheet date={openDay} today={today} checks={checks} onToggle={() => {}} onClose={() => setOpenDay(null)} readOnly photos={dayPhotos} />
     </main>
   );
 }
