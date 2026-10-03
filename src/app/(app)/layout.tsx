@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import BottomNav from "@/components/BottomNav";
 import DailyBanner from "@/components/DailyBanner";
 import ConfigMissing from "@/components/ConfigMissing";
+import { GroupProvider } from "@/components/GroupProvider";
 import { Spinner } from "@/components/ui";
 import { supabaseConfigured } from "@/lib/supabase";
 
@@ -21,10 +22,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (loading || !user) return <Spinner />;
 
   return (
-    <>
+    <GroupProvider userId={user.id}>
       <div className="mx-auto min-h-dvh max-w-5xl px-4 pb-32 pt-[calc(1.5rem+env(safe-area-inset-top))] sm:px-8">{children}</div>
       <BottomNav />
       <DailyBanner userId={user.id} />
-    </>
+    </GroupProvider>
   );
 }

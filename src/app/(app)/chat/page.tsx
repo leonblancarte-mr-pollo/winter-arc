@@ -1,11 +1,13 @@
 "use client";
-// PANTALLA 3: Chat grupal en tiempo real
+// PANTALLA 3: Chat en tiempo real del grupo activo (el mismo que se elige en Stats)
 import { BookOpen, Dumbbell, Footprints, ImagePlay, PartyPopper, SendHorizontal, Smartphone, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useGroups } from "@/components/GroupProvider";
+import GroupSwitcher from "@/components/GroupSwitcher";
 import GifPicker from "@/components/chat/GifPicker";
 import UserAvatar from "@/components/UserAvatar";
-import { ErrorBox, Spinner } from "@/components/ui";
+import { ErrorBox, Notice, Spinner } from "@/components/ui";
 import { dateInMX, longLabel, timeInMX, todayMX } from "@/lib/dates";
 import { signedPhotoUrl } from "@/lib/evidence";
 import { gifUrlFrom, toGifMessage } from "@/lib/gifs";
@@ -30,6 +32,11 @@ type Person = { name: string; avatar: AvatarOverride };
 export default function ChatPage() {
   const { user } = useAuth();
   const userId = user!.id;
+  // Sin grupos.sql (enabled = false) el chat sigue siendo uno solo para todos
+  const group = useGroups();
+  const groupId = group.enabled ? (group.active?.id ?? null) : undefined;
+  const waiting = group.loading;
+  const noGroup = groupId === null;
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [people, setPeople] = useState<Record<string, Person>>({});
   const [gifOpen, setGifOpen] = useState(false);
@@ -63,16 +70,24 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    // Carga datos de Supabase al abrir la pantalla (los setState ocurren después de la respuesta)
+    if (waiting || noGroup) return;
+    let alive = true;
+    // Carga datos de Supabase al abrir la pantalla o al cambiar de grupo (los setState ocurren después de la respuesta)
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMessages(null);
     loadNames();
     (async () => {
-      const recent = (system: boolean, limit: number) =>
-        supabase.from("messages").select("*").eq("is_system", system).order("created_at", { ascending: false }).limit(limit);
+      const recent = (system: boolean, limit: number) => {
+        let q = supabase.from("messages").select("*").eq("is_system", system);
+        if (groupId) q = q.eq("group_id", groupId);
+        return q.order("created_at", { ascending: false }).limit(limit);
+      };
       const [people, announcements] = await Promise.all([recent(false, LIMIT), recent(true, SYSTEM_LIMIT)]);
+      if (!alive) return;
       if (people.error) {
         // Sin la columna is_system (aún no se corrió anuncios_chat.sql): carga todo junto como antes
         const { data, error } = await supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(LIMIT);
+        if (!alive) return;
         if (error) return setError(errorES(error.message));
         return setMessages([...(data ?? [])].reverse() as Message[]);
       }
@@ -80,19 +95,20 @@ export default function ChatPage() {
       setMessages(all.sort((a, b) => a.id - b.id));
     })();
 
-    // Escucha mensajes nuevos en tiempo real
+    // Escucha mensajes nuevos en tiempo real (solo los del grupo activo)
     const channel = supabase
-      .channel("chat-grupal")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+      .channel(`chat-${groupId ?? "grupal"}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", ...(groupId ? { filter: `group_id=eq.${groupId}` } : {}) }, (payload) => {
         const m = payload.new as Message;
         merge([m]);
         if (!namesRef.current[m.user_id]) loadNames();
       })
       .subscribe();
     return () => {
+      alive = false;
       supabase.removeChannel(channel);
     };
-  }, [loadNames, merge]);
+  }, [loadNames, merge, groupId, waiting, noGroup]);
 
   // Baja al mensaje más reciente
   useLayoutEffect(() => {
@@ -103,7 +119,9 @@ export default function ChatPage() {
   async function post(content: string) {
     setSending(true);
     setError(null);
-    const { data, error } = await supabase.from("messages").insert({ user_id: userId, content }).select().single();
+    const row: Partial<Message> = { user_id: userId, content };
+    if (groupId) row.group_id = groupId;
+    const { data, error } = await supabase.from("messages").insert(row).select().single();
     setSending(false);
     if (error) {
       setError(`No se envió: ${errorES(error.message)}`);
@@ -129,10 +147,15 @@ export default function ChatPage() {
 
   return (
     <main className="mx-auto flex min-h-[calc(100dvh-10rem)] max-w-2xl flex-col">
+      <div>
+        <GroupSwitcher />
+      </div>
       <h1 className="display mb-6 text-5xl">Chat</h1>
 
       <div className="flex flex-1 flex-col pb-24">
-        {!messages ? (
+        {noGroup ? (
+          <Notice>Únete a un grupo con el botón de arriba para chatear con él.</Notice>
+        ) : !messages ? (
           <Spinner />
         ) : messages.length === 0 ? (
           <p className="py-12 text-center text-fg3">Todavía no hay mensajes. Escribe el primero.</p>
@@ -197,6 +220,7 @@ export default function ChatPage() {
       </div>
 
       {/* Campo de texto fijo arriba de la barra inferior */}
+      {!noGroup && (
       <form
         onSubmit={send}
         className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-hairline bg-black/80 px-4 py-3 backdrop-blur-xl"
@@ -241,6 +265,7 @@ export default function ChatPage() {
           </button>
         </div>
       </form>
+      )}
       {photo && (
         <div className="animate-fade fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setPhoto(null)} role="dialog" aria-label="Foto de evidencia">
           <button className="icon-btn absolute right-4 top-4" aria-label="Cerrar" onClick={() => setPhoto(null)}>

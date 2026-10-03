@@ -46,7 +46,16 @@ export type WorkoutSet = {
 };
 
 // is_system: anuncio automático (libro, medio maratón, cardio). Puede faltar si aún no se corrió anuncios_chat.sql
-export type Message = { id: number; user_id: string; content: string; created_at: string; is_system?: boolean; photo_path?: string | null };
+// group_id: chat al que pertenece (falta si aún no se corrió grupos.sql)
+export type Message = {
+  id: number;
+  user_id: string;
+  content: string;
+  created_at: string;
+  is_system?: boolean;
+  photo_path?: string | null;
+  group_id?: string;
+};
 
 export type LeaderboardRow = {
   user_id: string;
@@ -112,3 +121,6 @@ export type ChessInvitation = {
 
 // Hábitos personales: privados y sin puntos (ver supabase/habitos_personales.sql)
 export type CustomHabit = { id: number; user_id: string; name: string; icon: string | null; archived: boolean; created_at: string };
+
+// Grupos: con quién compites en el ranking y en qué chat estás (ver supabase/grupos.sql)
+export type Group = { id: string; name: string; code: string; created_by: string | null; created_at: string };

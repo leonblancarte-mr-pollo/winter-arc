@@ -2,11 +2,13 @@
 // PANTALLA 2: Stats (dashboard)
 import { useCallback, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useGroups } from "@/components/GroupProvider";
+import GroupSwitcher from "@/components/GroupSwitcher";
 import Activities from "@/components/stats/Activities";
 import Gym from "@/components/stats/Gym";
 import { CustomCompliance, HabitCompliance, Heatmap, SecondaryStats, SummaryCards, WeeklyPoints } from "@/components/stats/MyProgress";
 import Ranking from "@/components/stats/Ranking";
-import { ErrorBox, SectionTitle, Spinner } from "@/components/ui";
+import { ErrorBox, Notice, SectionTitle, Spinner } from "@/components/ui";
 import { todayMX } from "@/lib/dates";
 import { useCustomHabits } from "@/lib/useCustomHabits";
 import { useMyData } from "@/lib/useMyData";
@@ -19,7 +21,11 @@ export default function StatsPage() {
   const { checks, pointEvents: bonuses, loading, error, reload, markLocal } = useMyData(userId);
   const custom = useCustomHabits(userId);
   const [rankKey, setRankKey] = useState(0);
-  const ranking = useRanking(userId, today, rankKey);
+  // El ranking solo cuenta a los miembros del grupo activo (sin grupos.sql: a todos)
+  const group = useGroups();
+  const rankingReady = !group.loading && (!group.enabled || group.memberIds != null);
+  const ranking = useRanking(userId, today, rankKey, group.enabled ? group.memberIds : null, rankingReady);
+  const noGroup = group.enabled && !group.loading && !group.active;
 
   const myIdx = ranking.rows?.findIndex((r) => r.user_id === userId) ?? -1;
   const position = myIdx >= 0 ? myIdx + 1 : null;
@@ -35,6 +41,7 @@ export default function StatsPage() {
 
   return (
     <main>
+      <GroupSwitcher />
       <h1 className="display mb-8 text-5xl">Stats</h1>
 
       {error && (
@@ -60,7 +67,11 @@ export default function StatsPage() {
       )}
 
       <SectionTitle>Ranking de la carrera</SectionTitle>
-      <Ranking rows={ranking.rows} progress={ranking.progress} userId={userId} error={ranking.error} />
+      {noGroup ? (
+        <Notice>Únete a un grupo con el botón de arriba para ver el ranking de tu grupo.</Notice>
+      ) : (
+        <Ranking rows={ranking.rows} progress={ranking.progress} userId={userId} error={ranking.error} />
+      )}
 
       {!loading && (
         <>
