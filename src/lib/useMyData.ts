@@ -6,6 +6,7 @@
 // los demás solo leen lo que de verdad ya está guardado en Supabase.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPETITION_END, COMPETITION_START } from "./constants";
+import { isEditableDay, todayMX } from "./dates";
 import { addPendingAction, getPendingActions, markActionSynced, pruneSyncedActions, type HabitAction } from "./offlineDb";
 import { groupChecks, type ChecksByDate, type PointEvent } from "./points";
 import { fetchSpentPoints, type SpentPoint } from "./spentPoints";
@@ -94,7 +95,14 @@ export function useMyData(userId: string) {
     syncingRef.current = true;
     try {
       const pending = await getPendingActions(userId);
+      const today = todayMX();
       for (const a of pending) {
+        // Quedó en cola hasta que el día ya no se puede editar: se descarta (la base lo rechazaría
+        // y atoraría la cola). Al recargar, la pantalla muestra lo que de verdad quedó guardado.
+        if (!isEditableDay(a.date, today)) {
+          await markActionSynced(a.id);
+          continue;
+        }
         const { error } =
           a.action === "add"
             ? await supabase

@@ -3,6 +3,7 @@
 import { Archive, Check, Plus, Star } from "lucide-react";
 import { useState } from "react";
 import { ErrorBox, Sheet } from "@/components/ui";
+import { isEditableDay } from "@/lib/dates";
 import type { CustomChecks } from "@/lib/useCustomHabits";
 import type { CustomHabit } from "@/lib/types";
 
@@ -33,6 +34,8 @@ export default function CustomHabitsSection({
   // Hábito que espera confirmación para archivarse (un segundo toque lo archiva)
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const isFuture = date > today;
+  // Antes de ayer queda de solo lectura (igual que los hábitos oficiales)
+  const locked = date < today && !isEditableDay(date, today);
   const done = checks[date] ?? new Set<number>();
 
   async function submit(e: React.FormEvent) {
@@ -68,10 +71,10 @@ export default function CustomHabitsSection({
           return (
             <li key={h.id} className="flex items-center gap-1">
               <button
-                disabled={isFuture}
+                disabled={isFuture || locked}
                 onClick={() => onToggle(date, h.id, !on)}
                 aria-pressed={on}
-                className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors duration-150 ease-out enabled:hover:bg-white/[0.04] disabled:cursor-not-allowed ${
+                className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors duration-150 ease-out enabled:hover:bg-white/[0.04] ${locked ? "disabled:cursor-default" : "disabled:cursor-not-allowed"} ${
                   isFuture ? "opacity-40" : ""
                 }`}
               >

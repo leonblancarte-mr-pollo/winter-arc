@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartLegend, ErrorBox, Notice, SectionTitle, Spinner } from "@/components/ui";
 import { CHART_COLORS, COMPETITION_END, COMPETITION_START } from "@/lib/constants";
-import { addDays, dateInMX, shortLabel, weekStart } from "@/lib/dates";
+import { addDays, dateInMX, isEditableDay, shortLabel, weekStart } from "@/lib/dates";
 import { parseHevyFile } from "@/lib/hevy";
 import { errorES, fetchAll, supabase } from "@/lib/supabase";
 import type { WorkoutSet } from "@/lib/types";
@@ -70,9 +70,10 @@ export default function Gym({ userId, today, onGymDaysMarked }: { userId: string
         if (error) throw new Error(`Error al guardar: ${errorES(error.message)}`);
       }
 
-      // 2) Marca "Ir al gym" en los días de la carrera con entrenamiento
+      // 2) Marca "Ir al gym" en los días de la carrera con entrenamiento.
+      //    Solo hoy y ayer: los días anteriores ya no se pueden editar (los sets sí se guardan).
       const lastDay = today < COMPETITION_END ? today : COMPETITION_END;
-      const gymDays = parsed.workoutDates.filter((d) => d >= COMPETITION_START && d <= lastDay);
+      const gymDays = parsed.workoutDates.filter((d) => d >= COMPETITION_START && d <= lastDay && isEditableDay(d, today));
       if (gymDays.length) {
         setStatus("Marcando días de gym…");
         const { error } = await supabase

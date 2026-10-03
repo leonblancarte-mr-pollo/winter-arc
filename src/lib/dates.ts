@@ -39,6 +39,12 @@ export function addDays(d: string, n: number) {
   return fromUTC(x);
 }
 
+// Solo hoy y ayer se pueden tachar/destachar; antes de ayer queda de solo lectura
+// (misma regla que las políticas de supabase/edicion_hoy_ayer.sql)
+export function isEditableDay(date: string, today: string) {
+  return date <= today && date >= addDays(today, -1);
+}
+
 export function daysInMonth(year: number, month: number) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }

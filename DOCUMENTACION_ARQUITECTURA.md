@@ -1,11 +1,12 @@
 # WINTER ARC — DOCUMENTACIÓN DE ARQUITECTURA
 
-> Última actualización: 2026-10-03 (Grupos: ranking y chat por grupo — `supabase/grupos.sql`).
+> Última actualización: 2026-10-03 (Edición solo de hoy y ayer — `supabase/edicion_hoy_ayer.sql`; antes ese día, Grupos — `supabase/grupos.sql`).
 > Versión Word: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (mismo contenido).
 > Audiencia: quien necesite continuar el proyecto sin preguntar.
 
 ## CHANGELOG
 
+- 2026-10-03 — **Edición solo hoy y ayer**: los hábitos (oficiales y personales) solo se tachan/destachan hoy o ayer; antes de ayer es de solo lectura. Aplica al panel del día, a la importación de Hevy y a la cola offline, y lo refuerza RLS. No cambia ningún dato ya guardado.
 - 2026-10-03 — **Grupos**: el ranking de la carrera y el chat pasan a ser por grupo. Casino, ajedrez, hábitos, puntos, racha y evidencia siguen globales/por usuario. Grupo "WINTER ARC ORIGINAL" con todos los usuarios existentes. Solo el admin crea grupos; cualquiera se une con código.
 - 2026-10-03 — Primera versión de este documento (antes solo existía el README).
 
@@ -76,7 +77,8 @@ supabase/                     Scripts SQL (ver sección 5)
 2. `anuncios_chat.sql` — `messages.is_system` y triggers que anuncian libro, medio maratón y cardio.
 3. `casino.sql` → `ajedrez_y_tragamonedas.sql` → `easter_egg.sql`.
 4. `habitos_personales.sql`, `evidencia_habitos.sql`.
-5. **`grupos.sql`** — grupos, admins, chat por grupo y migración a "WINTER ARC ORIGINAL". Correr al final. Se puede repetir.
+5. **`grupos.sql`** — grupos, admins, chat por grupo y migración a "WINTER ARC ORIGINAL". Se puede repetir.
+6. **`edicion_hoy_ayer.sql`** — reglas RLS de "solo hoy y ayer" (ver sección 7). Se puede repetir.
 
 ## 6. Grupos (ranking y chat por grupo)
 
@@ -134,13 +136,32 @@ Decisión: **el anuncio aparece en TODOS los grupos del usuario.** Fue lo más s
 - Compatibilidad: si `grupos.sql` aún no se corrió, `enabled = false`, el selector no aparece y todo funciona como antes (un solo ranking y chat).
 - Usuarios nuevos: al registrarse NO entran a ningún grupo; ven un aviso en Stats y Chat para unirse con código.
 
-## 7. Seguridad (resumen)
+## 7. Ventana de edición: solo hoy y ayer
+
+| Día | Qué se puede hacer |
+|---|---|
+| Futuro | Nada (bloqueado, como siempre) |
+| Hoy y ayer | Tachar/destachar. Los hábitos con foto (`PHOTO_HABITS`) piden evidencia en ambos días |
+| Antes de ayer | Solo lectura: se ve lo marcado y las fotos, con el aviso "Este día ya no se puede editar" |
+
+Dónde vive la regla:
+
+- `isEditableDay(date, today)` en `src/lib/dates.ts` (hora de CDMX vía `todayMX()`).
+- `DaySheet` y `CustomHabitsSection`: casillas deshabilitadas (cursor normal, sin hover) y aviso con candado.
+- `calendario/page.tsx` → `onToggle` ignora días cerrados; `HabitPhotoModal` guarda la evidencia con la fecha del día que se tacha (hoy o ayer).
+- `stats/Gym.tsx` (importación de Hevy): los sets se guardan todos, pero "Ir al gym" solo se marca hoy/ayer.
+- `useMyData.sync()`: si una acción offline quedó en cola hasta que su día se cerró, se descarta (si no, la base la rechazaría y atoraría la cola).
+- Base de datos (`edicion_hoy_ayer.sql`): función `is_editable_day(date)` usada en las políticas de INSERT y DELETE de `habit_checks`, `habit_evidence` y `custom_habit_checks`.
+
+No aplica a los bonus (libro, medio maratón), que tienen sus propias reglas de fecha.
+
+## 8. Seguridad (resumen)
 
 - RLS en todas las tablas. Escrituras sensibles (puntos del casino, apuestas, ajedrez, grupos) solo por funciones `security definer` o rutas del servidor con `service_role`.
 - Los anuncios del chat solo los puede crear la base de datos (triggers); el usuario no puede insertar `is_system = true`.
 - El admin se identifica por `user_id` en `app_admins`, nunca por algo que mande el navegador.
 
-## 8. Cómo correr
+## 9. Cómo correr
 
 1. `.env.local` con `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (y la `service_role` para las rutas del servidor; ver `.env.example`).
 2. Correr los SQL de la sección 5 en Supabase > SQL Editor.

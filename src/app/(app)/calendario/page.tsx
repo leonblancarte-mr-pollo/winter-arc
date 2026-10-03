@@ -9,7 +9,7 @@ import DaySheet from "@/components/calendar/DaySheet";
 import HabitPhotoModal from "@/components/calendar/HabitPhotoModal";
 import { ErrorBox, PointsBurst, Ring, Spinner, SyncBadge, Wordmark } from "@/components/ui";
 import { COMPETITION_END, COMPETITION_MONTHS, HABITS, PHOTO_HABITS } from "@/lib/constants";
-import { daysInMonth, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
+import { daysInMonth, isEditableDay, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
 import { countOn, currentStreak, totalPoints } from "@/lib/points";
 import { supabase } from "@/lib/supabase";
 import type { BonusEvent } from "@/lib/types";
@@ -36,24 +36,26 @@ export default function CalendarioPage() {
   const [monthIdx, setMonthIdx] = useState(today > COMPETITION_END ? COMPETITION_MONTHS.length - 1 : initialIdx);
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [form, setForm] = useState<{ type: "book" | "half"; day: string } | null>(null);
-  // Hábito de hoy que está esperando su foto para marcarse
-  const [photoFor, setPhotoFor] = useState<string | null>(null);
+  // Hábito (de hoy o de ayer) que está esperando su foto para marcarse
+  const [photoFor, setPhotoFor] = useState<{ key: string; date: string } | null>(null);
   const [burst, setBurst] = useState<number | null>(null);
   const clearBurst = useCallback(() => setBurst(null), []);
 
   const dayPhotos = useDayPhotos(evidence.rows, openDay);
 
-  // Los hábitos con foto se marcan solo hoy y con evidencia; en días pasados se tachan como siempre.
-  // Al destachar uno con foto, se quita también la evidencia.
+  // Solo se tacha/destacha hoy y ayer (antes de ayer es de solo lectura).
+  // Los hábitos con foto piden evidencia en esos dos días. Al destachar uno con foto, se quita también la evidencia.
   function onToggle(date: string, key: string, on: boolean) {
-    if (on && date === today && PHOTO_HABITS.includes(key)) return setPhotoFor(key);
+    if (!isEditableDay(date, today)) return;
+    if (on && PHOTO_HABITS.includes(key)) return setPhotoFor({ key, date });
     if (!on) void evidence.remove(date, key);
     toggle(date, key, on);
   }
 
   async function saveWithPhoto(key: string, file: File) {
-    await evidence.save(today, key, file);
-    toggle(today, key, true);
+    const date = photoFor?.date ?? today;
+    await evidence.save(date, key, file);
+    toggle(date, key, true);
   }
 
   const pts = useMemo(() => totalPoints(checks, pointEvents), [checks, pointEvents]);
@@ -201,7 +203,13 @@ export default function CalendarioPage() {
         </section>
       )}
 
-      <HabitPhotoModal key={photoFor ?? "none"} habitKey={photoFor} onClose={() => setPhotoFor(null)} onSave={saveWithPhoto} />
+      <HabitPhotoModal
+        key={photoFor ? `${photoFor.date}-${photoFor.key}` : "none"}
+        habitKey={photoFor?.key ?? null}
+        isYesterday={!!photoFor && photoFor.date < today}
+        onClose={() => setPhotoFor(null)}
+        onSave={saveWithPhoto}
+      />
       <DaySheet date={openDay} today={today} checks={checks} onToggle={onToggle} photos={dayPhotos} onClose={() => setOpenDay(null)} onOpenBonus={openBonus}
         extra={
           openDay && (

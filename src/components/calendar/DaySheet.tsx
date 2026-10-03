@@ -5,7 +5,7 @@ import { useState } from "react";
 import HabitIcon from "@/components/HabitIcon";
 import { Sheet } from "@/components/ui";
 import { BOOK_BONUS, HABITS, HALF_MARATHON_BONUS, WEEKLY_BONUSES } from "@/lib/constants";
-import { longLabel } from "@/lib/dates";
+import { isEditableDay, longLabel } from "@/lib/dates";
 import { weekHabitCount, type ChecksByDate } from "@/lib/points";
 
 export default function DaySheet({
@@ -40,6 +40,9 @@ export default function DaySheet({
     setExpanded({ date, keys: openKeys.includes(key) ? openKeys.filter((k) => k !== key) : [...openKeys, key] });
   const isFuture = date > today;
   const isPast = date < today;
+  // Antes de ayer: se ve lo que se marcó, pero ya no se puede cambiar
+  const locked = isPast && !isEditableDay(date, today);
+  const blocked = isFuture || readOnly || locked;
   const done = checks[date] ?? new Set<string>();
   const total = HABITS.length;
 
@@ -66,6 +69,11 @@ export default function DaySheet({
           <Lock size={16} /> Podrás tacharlo cuando llegue el día.
         </div>
       )}
+      {locked && !readOnly && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-raised px-3 py-2 text-fg2">
+          <Lock size={16} /> Este día ya no se puede editar. Solo puedes tachar hoy y ayer.
+        </div>
+      )}
 
       <ul className="-mx-2 flex flex-col">
         {HABITS.map((h) => {
@@ -74,10 +82,10 @@ export default function DaySheet({
           return (
             <li key={h.key}>
               <button
-                disabled={isFuture || readOnly}
+                disabled={blocked}
                 onClick={() => onToggle(date, h.key, !on)}
                 aria-pressed={on}
-                className={`group flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors duration-150 ease-out enabled:hover:bg-white/[0.04] ${readOnly ? "disabled:cursor-default" : "disabled:cursor-not-allowed"} ${
+                className={`group flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors duration-150 ease-out enabled:hover:bg-white/[0.04] ${readOnly || locked ? "disabled:cursor-default" : "disabled:cursor-not-allowed"} ${
                   isFuture && !readOnly ? "opacity-40" : ""
                 }`}
               >
