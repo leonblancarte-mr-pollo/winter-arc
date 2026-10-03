@@ -3,7 +3,7 @@
 // El número lo saca el servidor con un generador aleatorio seguro; aquí solo se anima.
 import { ArrowLeft, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import AnimatedNumber from "@/components/casino/AnimatedNumber";
 import { ChipPicker } from "@/components/casino/Chips";
@@ -12,6 +12,10 @@ import RouletteWheel, { type RouletteWheelHandle } from "@/components/casino/Rou
 import { ErrorBox, Spinner } from "@/components/ui";
 import { casinoPost, formatPeseis, useCasinoBalance } from "@/lib/casino/client";
 import { betKey, betLabel, colorOf, labelOf, type BetType, type RouletteBet } from "@/lib/casino/roulette";
+
+// EASTER EGG intencional: con saldo 0, tocar 6-7-6-7 en el tablero regala 50 peseis.
+// El servidor valida que el saldo sea 0 (ver /api/casino/easter-egg). No se documenta en la UI.
+const EGG_SEQUENCE = [6, 7, 6, 7];
 
 type SpinResponse = { result: number; stake: number; payout: number; net: number; balance: number };
 
@@ -25,13 +29,42 @@ export default function RuletaPage() {
   const [outcome, setOutcome] = useState<SpinResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const wheel = useRef<RouletteWheelHandle>(null);
+  // EASTER EGG: cuántos toques correctos de la secuencia lleva, y el aviso discreto de +50
+  const eggProgress = useRef(0);
+  const [eggNote, setEggNote] = useState(false);
+  useEffect(() => {
+    if (!eggNote) return;
+    const t = setTimeout(() => setEggNote(false), 2500);
+    return () => clearTimeout(t);
+  }, [eggNote]);
 
   const chip = stack.reduce((s, v) => s + v, 0);
   const totalBet = Object.values(bets).reduce((s, b) => s + b.amount, 0);
   const available = (balance ?? 0) - totalBet;
 
   // Pone la ficha armada en la casilla tocada (se acumula si tocas la misma otra vez)
+  // EASTER EGG: solo se cuenta con saldo 0 (sin saldo no se puede apostar, así que no estorba al juego).
+  // Un toque equivocado reinicia el conteo en silencio; un 6 vuelve a empezar la secuencia.
+  async function eggTap(bet: { type: BetType; value?: number }) {
+    const n = bet.type === "straight" ? bet.value : undefined;
+    if (n !== EGG_SEQUENCE[eggProgress.current]) {
+      eggProgress.current = n === EGG_SEQUENCE[0] ? 1 : 0;
+      return;
+    }
+    eggProgress.current++;
+    if (eggProgress.current < EGG_SEQUENCE.length) return;
+    eggProgress.current = 0;
+    try {
+      const res = await casinoPost<{ balance: number }>("/api/casino/easter-egg", {});
+      setBalance(res.balance);
+      setEggNote(true);
+    } catch {
+      // Silencioso a propósito: si no aplica, no pasa nada
+    }
+  }
+
   function place(bet: { type: BetType; value?: number }) {
+    if (balance === 0 && !spinning) void eggTap(bet); // EASTER EGG
     setError(null);
     if (chip <= 0) return setError("Primero arma tu ficha tocando las fichas de abajo.");
     if (chip > available) return setError("No te alcanza para poner esa ficha.");
@@ -78,6 +111,7 @@ export default function RuletaPage() {
         <div className="text-right">
           <div className="label">Peseis</div>
           <div className="display text-3xl">{balance == null ? "…" : <AnimatedNumber value={balance} />}</div>
+          {eggNote && <div className="animate-fade text-xs text-done">+50</div> /* EASTER EGG */}
         </div>
       </div>
       {balanceError && (
