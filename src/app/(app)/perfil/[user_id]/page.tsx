@@ -8,11 +8,11 @@ import { useEffect, useMemo, useState } from "react";
 import DaySheet from "@/components/calendar/DaySheet";
 import UserAvatar from "@/components/UserAvatar";
 import { ErrorBox, Ring, SectionTitle, Spinner } from "@/components/ui";
-import { ACTIVITY_TYPES, COMPETITION_END, COMPETITION_MONTHS, COMPETITION_START, HABITS } from "@/lib/constants";
+import { ACTIVITY_TYPES, COMPETITION_END, COMPETITION_MONTHS, COMPETITION_START } from "@/lib/constants";
 import { daysInMonth, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
 import { useDayPhotos, useEvidence } from "@/lib/evidence";
 import { loadPeople, type Person } from "@/lib/people";
-import { countOn, currentStreak, groupChecks, type ChecksByDate } from "@/lib/points";
+import { countOn, currentStreak, groupChecks, maxOn, type ChecksByDate } from "@/lib/points";
 import { errorES, fetchAll, supabase } from "@/lib/supabase";
 import type { Activity, BonusEvent, HabitCheck, LeaderboardRow } from "@/lib/types";
 
@@ -149,7 +149,6 @@ export default function PerfilPage() {
   const { year, month } = COMPETITION_MONTHS[monthIdx];
   const nDays = daysInMonth(year, month);
   const offset = weekdayMon0(ymd(year, month, 1));
-  const total = HABITS.length;
   const { person, checks, bonuses, activities } = data;
   const books = bonuses.filter((b) => b.type === "book");
   const halves = bonuses.filter((b) => b.type === "half_marathon");
@@ -220,6 +219,7 @@ export default function PerfilPage() {
           {Array.from({ length: nDays }).map((_, i) => {
             const date = ymd(year, month, i + 1);
             const n = countOn(checks, date);
+            const total = maxOn(date);
             const isToday = date === today;
             const isFuture = date > today;
             const full = n === total;

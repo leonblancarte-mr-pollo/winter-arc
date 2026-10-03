@@ -1,11 +1,12 @@
 # WINTER ARC — DOCUMENTACIÓN DE ARQUITECTURA
 
-> Última actualización: 2026-10-03 (Edición solo de hoy y ayer — `supabase/edicion_hoy_ayer.sql`; antes ese día, Grupos — `supabase/grupos.sql`).
+> Última actualización: 2026-10-03 (Hábito "Dieta" — `supabase/dieta.sql`; antes ese día, edición solo de hoy y ayer — `supabase/edicion_hoy_ayer.sql`; antes ese día, Grupos — `supabase/grupos.sql`).
 > Versión Word: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (mismo contenido).
 > Audiencia: quien necesite continuar el proyecto sin preguntar.
 
 ## CHANGELOG
 
+- 2026-10-03 — **Hábito nuevo "Dieta"** (10mo, key `dieta`, ícono `Salad`, pide foto). Máximo diario 10 y racha 8/10 desde el 2026-10-03; los días anteriores siguen con 9 y 7/9. Anuncio "🥗 X cuidó su dieta" en el chat.
 - 2026-10-03 — **Edición solo hoy y ayer**: los hábitos (oficiales y personales) solo se tachan/destachan hoy o ayer; antes de ayer es de solo lectura. Aplica al panel del día, a la importación de Hevy y a la cola offline, y lo refuerza RLS. No cambia ningún dato ya guardado.
 - 2026-10-03 — **Grupos**: el ranking de la carrera y el chat pasan a ser por grupo. Casino, ajedrez, hábitos, puntos, racha y evidencia siguen globales/por usuario. Grupo "WINTER ARC ORIGINAL" con todos los usuarios existentes. Solo el admin crea grupos; cualquiera se une con código.
 - 2026-10-03 — Primera versión de este documento (antes solo existía el README).
@@ -79,6 +80,7 @@ supabase/                     Scripts SQL (ver sección 5)
 4. `habitos_personales.sql`, `evidencia_habitos.sql`.
 5. **`grupos.sql`** — grupos, admins, chat por grupo y migración a "WINTER ARC ORIGINAL". Se puede repetir.
 6. **`edicion_hoy_ayer.sql`** — reglas RLS de "solo hoy y ayer" (ver sección 7). Se puede repetir.
+7. **`dieta.sql`** — agrega "dieta" al anuncio automático de evidencia (ver sección 8). Se puede repetir.
 
 ## 6. Grupos (ranking y chat por grupo)
 
@@ -155,13 +157,40 @@ Dónde vive la regla:
 
 No aplica a los bonus (libro, medio maratón), que tienen sus propias reglas de fecha.
 
-## 8. Seguridad (resumen)
+## 8. Hábitos
+
+Se definen en `HABITS` (`src/lib/constants.ts`); la `key` es lo que se guarda en `habit_checks` y nunca debe cambiar. `habit_checks` no tiene lista de keys permitidas, así que un hábito nuevo no necesita migración de tablas.
+
+| # | key | Hábito | Foto |
+|---|---|---|---|
+| 1 | `gym` | Ir al gym | Sí |
+| 2 | `cardio` | Cardio | Sí |
+| 3 | `leer` | Leer 5 páginas | Sí |
+| 4 | `dormir` | Dormir 7 horas | No |
+| 5 | `pasos` | 10,000 pasos | Sí |
+| 6 | `pantalla` | Menos de 5 hrs de pantalla | Sí (captura de Tiempo de Uso) |
+| 7 | `proyecto` | 1 hr de proyecto personal | No |
+| 8 | `no_pajiza` | No chaketa | No |
+| 9 | `agua_3litros` | 3 litros de agua | No |
+| 10 | `dieta` | Dieta (desde 2026-10-03) | Sí (macros o una comida) |
+
+Hábitos agregados con la carrera ya empezada:
+
+- `HABIT_SINCE` (constants.ts) guarda la fecha de inicio de cada hábito nuevo (`dieta: "2026-10-03"`).
+- `habitsOn(date)` / `maxOn(date)` (points.ts) dan los hábitos y el máximo de ese día: 9 antes de Dieta, 10 después. Los usan los anillos del calendario y del perfil, el panel del día, el mapa de calor, el % de cumplimiento y "Puntos de hoy".
+- Cumplimiento por hábito: el % de Dieta se calcula solo con los días desde que existe.
+- Racha: `streakMinOn(date)` → 7 antes de Dieta (`STREAK_MIN_HABITS_BEFORE_DIETA`), 8 desde entonces (`STREAK_MIN_HABITS`). Es la misma proporción (~78%, redondeada hacia arriba), y así nadie pierde la racha que ya llevaba.
+- Los puntos no cambian: cada hábito marcado vale 1, igual en la app y en la vista `leaderboard`.
+
+Para agregar otro hábito con foto: entrada al final de `HABITS`, su fecha en `HABIT_SINCE`, ícono en `HabitIcon.tsx`, key en `PHOTO_HABITS`, texto en `HabitPhotoModal.tsx`, emoji→ícono en `SYSTEM_ICONS` del chat y un `when` en `announce_habit_evidence()` (SQL). Si cambia el máximo, ajustar la racha con una regla por fecha como la de Dieta.
+
+## 9. Seguridad (resumen)
 
 - RLS en todas las tablas. Escrituras sensibles (puntos del casino, apuestas, ajedrez, grupos) solo por funciones `security definer` o rutas del servidor con `service_role`.
 - Los anuncios del chat solo los puede crear la base de datos (triggers); el usuario no puede insertar `is_system = true`.
 - El admin se identifica por `user_id` en `app_admins`, nunca por algo que mande el navegador.
 
-## 9. Cómo correr
+## 10. Cómo correr
 
 1. `.env.local` con `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (y la `service_role` para las rutas del servidor; ver `.env.example`).
 2. Correr los SQL de la sección 5 en Supabase > SQL Editor.

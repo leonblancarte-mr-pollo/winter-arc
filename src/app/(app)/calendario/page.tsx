@@ -8,9 +8,9 @@ import CustomHabitsSection from "@/components/calendar/CustomHabitsSection";
 import DaySheet from "@/components/calendar/DaySheet";
 import HabitPhotoModal from "@/components/calendar/HabitPhotoModal";
 import { ErrorBox, PointsBurst, Ring, Spinner, SyncBadge, Wordmark } from "@/components/ui";
-import { COMPETITION_END, COMPETITION_MONTHS, HABITS, PHOTO_HABITS } from "@/lib/constants";
+import { COMPETITION_END, COMPETITION_MONTHS, PHOTO_HABITS } from "@/lib/constants";
 import { daysInMonth, isEditableDay, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
-import { countOn, currentStreak, totalPoints } from "@/lib/points";
+import { countOn, currentStreak, maxOn, totalPoints } from "@/lib/points";
 import { supabase } from "@/lib/supabase";
 import type { BonusEvent } from "@/lib/types";
 import { useDayPhotos, useEvidence } from "@/lib/evidence";
@@ -64,7 +64,6 @@ export default function CalendarioPage() {
   const { year, month } = COMPETITION_MONTHS[monthIdx];
   const nDays = daysInMonth(year, month);
   const offset = weekdayMon0(ymd(year, month, 1));
-  const total = HABITS.length;
 
   function onBonusSaved(b: BonusEvent) {
     addBonusLocal(b);
@@ -155,6 +154,7 @@ export default function CalendarioPage() {
             {Array.from({ length: nDays }).map((_, i) => {
               const date = ymd(year, month, i + 1);
               const n = countOn(checks, date);
+              const total = maxOn(date);
               const isToday = date === today;
               const isFuture = date > today;
               const full = n === total;

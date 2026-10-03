@@ -53,6 +53,8 @@ export default function HabitPhotoModal({
         <p className="text-fg2">
           {habitKey === "pantalla"
             ? "Sube una captura de pantalla de tu Tiempo de Uso (iPhone: Ajustes > Tiempo de Uso) o Bienestar Digital (Android), mostrando el día de AYER."
+            : habitKey === "dieta"
+            ? `Sube una foto de tus macros del día o de alguna de tus comidas de ${isYesterday ? "ayer" : "hoy"}.`
             : `Sube una foto que confirme que lo hiciste ${isYesterday ? "ayer" : "hoy"}.`}
         </p>
         <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-white/[0.12] bg-field px-3 py-4 text-fg2 transition-colors duration-150 hover:border-accent">

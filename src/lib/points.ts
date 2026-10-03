@@ -3,9 +3,11 @@
 import {
   COMPETITION_END,
   COMPETITION_START,
+  HABIT_SINCE,
   HABITS,
   POINTS_PER_HABIT,
   STREAK_MIN_HABITS,
+  STREAK_MIN_HABITS_BEFORE_DIETA,
   WEEKLY_BONUSES,
 } from "./constants";
 import { addDays, dateRange, todayMX, weekStart } from "./dates";
@@ -26,6 +28,21 @@ export function groupChecks(rows: { date: string; habit_key: string }[]): Checks
 
 export function countOn(checks: ChecksByDate, date: string) {
   return checks[date]?.size ?? 0;
+}
+
+// Hábitos que existían en una fecha (Dieta empieza en HABIT_SINCE.dieta)
+export function habitsOn(date: string) {
+  return HABITS.filter((h) => (HABIT_SINCE[h.key] ?? COMPETITION_START) <= date);
+}
+
+// Máximo de hábitos de un día (9 antes de Dieta, 10 desde entonces)
+export function maxOn(date: string) {
+  return habitsOn(date).length;
+}
+
+// Hábitos mínimos para que un día cuente en la racha
+export function streakMinOn(date: string) {
+  return date < (HABIT_SINCE.dieta ?? COMPETITION_START) ? STREAK_MIN_HABITS_BEFORE_DIETA : STREAK_MIN_HABITS;
 }
 
 // Cuántas veces se cumplió un hábito en la semana (lunes-domingo) de "date"
@@ -63,9 +80,9 @@ export function pointsOn(checks: ChecksByDate, bonuses: PointEvent[], date: stri
   return countOn(checks, date) * POINTS_PER_HABIT + bonuses.filter((b) => b.date === date).reduce((s, b) => s + b.points, 0);
 }
 
-// Racha actual: días seguidos con STREAK_MIN_HABITS+ hasta ayer; hoy se suma si ya llegó.
+// Racha actual: días seguidos con el mínimo del día (streakMinOn) hasta ayer; hoy se suma si ya llegó.
 export function currentStreak(checks: ChecksByDate, today = todayMX()) {
-  const ok = (d: string) => countOn(checks, d) >= STREAK_MIN_HABITS;
+  const ok = (d: string) => countOn(checks, d) >= streakMinOn(d);
   let streak = ok(today) ? 1 : 0;
   for (let d = addDays(today, -1); d >= COMPETITION_START; d = addDays(d, -1)) {
     if (!ok(d)) break;
@@ -80,7 +97,7 @@ export function bestStreak(checks: ChecksByDate, today = todayMX()) {
   let best = 0;
   let run = 0;
   for (const d of dateRange(COMPETITION_START, end)) {
-    run = countOn(checks, d) >= STREAK_MIN_HABITS ? run + 1 : 0;
+    run = countOn(checks, d) >= streakMinOn(d) ? run + 1 : 0;
     best = Math.max(best, run);
   }
   return best;

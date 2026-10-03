@@ -4,7 +4,7 @@ import { Star } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import HabitIcon from "@/components/HabitIcon";
 import { ChartLegend, Trend } from "@/components/ui";
-import { CHART_COLORS, COMPETITION_END, COMPETITION_START, HABITS } from "@/lib/constants";
+import { CHART_COLORS, COMPETITION_END, COMPETITION_START, HABIT_SINCE, HABITS } from "@/lib/constants";
 import { addDays, dateInMX, dateRange, elapsedCompetitionDays, longLabel, shortLabel, weekStart } from "@/lib/dates";
 import {
   bestStreak,
@@ -12,6 +12,7 @@ import {
   checksUpTo,
   countOn,
   currentStreak,
+  maxOn,
   pointsByWeek,
   pointsOn,
   totalPoints,
@@ -73,10 +74,10 @@ function BigStat({ label, value, unit, trend }: { label: string; value: React.Re
 export function SecondaryStats({ checks, bonuses, today }: Props) {
   const elapsed = elapsedCompetitionDays(today);
   const totalChecks = elapsed.reduce((s, d) => s + countOn(checks, d), 0);
-  const possible = elapsed.length * HABITS.length;
+  const possible = elapsed.reduce((s, d) => s + maxOn(d), 0);
   const pct = possible ? Math.round((totalChecks / possible) * 100) : 0;
   const items = [
-    { label: "Puntos de hoy", value: pointsOn(checks, bonuses, today), sub: `${countOn(checks, today)} de ${HABITS.length} hábitos` },
+    { label: "Puntos de hoy", value: pointsOn(checks, bonuses, today), sub: `${countOn(checks, today)} de ${maxOn(today)} hábitos` },
     { label: "Mejor racha", value: bestStreak(checks, today), sub: "días seguidos" },
     { label: "Cumplimiento", value: `${pct}%`, sub: `${totalChecks} de ${possible} hábitos` },
   ];
@@ -97,8 +98,10 @@ export function SecondaryStats({ checks, bonuses, today }: Props) {
 export function HabitCompliance({ checks, today }: Omit<Props, "bonuses">) {
   const elapsed = elapsedCompetitionDays(today);
   const perHabit = HABITS.map((h) => {
-    const n = elapsed.filter((d) => checks[d]?.has(h.key)).length;
-    return { ...h, n, pct: elapsed.length ? Math.round((n / elapsed.length) * 100) : 0 };
+    // Solo cuentan los días desde que existe el hábito (Dieta empezó después)
+    const days = elapsed.filter((d) => d >= (HABIT_SINCE[h.key] ?? COMPETITION_START));
+    const n = days.filter((d) => checks[d]?.has(h.key)).length;
+    return { ...h, n, total: days.length, pct: days.length ? Math.round((n / days.length) * 100) : 0 };
   });
   return (
     <div className="card flex flex-col gap-4">
@@ -109,7 +112,7 @@ export function HabitCompliance({ checks, today }: Omit<Props, "bonuses">) {
             <span className="flex-1 truncate">{h.short}</span>
             <span className="font-medium tabular-nums">{h.pct}%</span>
             <span className="w-16 text-right text-xs tabular-nums text-fg3">
-              {h.n}/{elapsed.length} días
+              {h.n}/{h.total} días
             </span>
           </div>
           <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
@@ -153,9 +156,8 @@ export function WeeklyPoints({ checks, bonuses }: Omit<Props, "today">) {
 // ---------- Mapa de calor (columnas = semanas, filas = lunes a domingo) ----------
 // 5 tonos: de zinc-900 (nada) a emerald-500 (día completo)
 const HEAT = ["#18181b", "#064e3b", "#047857", "#059669", "#10b981"];
-function heatLevel(n: number) {
+function heatLevel(n: number, max: number) {
   if (n === 0) return 0;
-  const max = HABITS.length;
   if (n >= max) return 4;
   return Math.min(3, Math.ceil((n / max) * 3)); // 1–3 para días parciales
 }
@@ -192,9 +194,9 @@ export function Heatmap({ checks, today }: Omit<Props, "bonuses">) {
                 return (
                   <div
                     key={d}
-                    title={inside ? `${longLabel(d)}: ${n} de ${HABITS.length}` : undefined}
+                    title={inside ? `${longLabel(d)}: ${n} de ${maxOn(d)}` : undefined}
                     className={`h-3 w-3 rounded-[3px] ${d === today ? "outline outline-1 outline-offset-1 outline-accent" : ""}`}
-                    style={{ background: !inside ? "transparent" : future ? "#0f0f11" : HEAT[heatLevel(n)] }}
+                    style={{ background: !inside ? "transparent" : future ? "#0f0f11" : HEAT[heatLevel(n, maxOn(d))] }}
                   />
                 );
               })}

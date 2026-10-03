@@ -4,9 +4,9 @@ import { BookOpen, Camera, Check, ChevronDown, ChevronRight, Lock, Medal } from 
 import { useState } from "react";
 import HabitIcon from "@/components/HabitIcon";
 import { Sheet } from "@/components/ui";
-import { BOOK_BONUS, HABITS, HALF_MARATHON_BONUS, WEEKLY_BONUSES } from "@/lib/constants";
+import { BOOK_BONUS, HALF_MARATHON_BONUS, WEEKLY_BONUSES } from "@/lib/constants";
 import { isEditableDay, longLabel } from "@/lib/dates";
-import { weekHabitCount, type ChecksByDate } from "@/lib/points";
+import { habitsOn, weekHabitCount, type ChecksByDate } from "@/lib/points";
 
 export default function DaySheet({
   date,
@@ -44,7 +44,9 @@ export default function DaySheet({
   const locked = isPast && !isEditableDay(date, today);
   const blocked = isFuture || readOnly || locked;
   const done = checks[date] ?? new Set<string>();
-  const total = HABITS.length;
+  // Dieta solo aparece desde el día en que se agregó
+  const habits = habitsOn(date);
+  const total = habits.length;
 
   return (
     <Sheet
@@ -76,7 +78,7 @@ export default function DaySheet({
       )}
 
       <ul className="-mx-2 flex flex-col">
-        {HABITS.map((h) => {
+        {habits.map((h) => {
           const on = done.has(h.key);
           const missed = isPast && !on;
           return (
