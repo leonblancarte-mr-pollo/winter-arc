@@ -1,6 +1,6 @@
 "use client";
 // PANTALLA 3: Chat en tiempo real del grupo activo (el mismo que se elige en Stats)
-import { BookOpen, Dumbbell, Footprints, ImagePlay, PartyPopper, Salad, SendHorizontal, Smartphone, Trophy, X } from "lucide-react";
+import { Bike, BookOpen, Dumbbell, Footprints, ImagePlay, PartyPopper, Salad, SendHorizontal, Smartphone, Trophy, Waves, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useGroups } from "@/components/GroupProvider";
@@ -20,7 +20,7 @@ const LIMIT = 100;
 const SYSTEM_LIMIT = 40;
 
 // Ícono de cada tipo de anuncio (el texto del mensaje empieza con su emoji)
-const SYSTEM_ICONS: Partial<Record<string, typeof Trophy>> = { "🏆": Trophy, "🏃": Footprints, "🎉": PartyPopper, "💪": Dumbbell, "📖": BookOpen, "👣": Footprints, "📵": Smartphone, "🥗": Salad };
+const SYSTEM_ICONS: Partial<Record<string, typeof Trophy>> = { "🏆": Trophy, "🏃": Footprints, "🎉": PartyPopper, "💪": Dumbbell, "📖": BookOpen, "👣": Footprints, "📵": Smartphone, "🥗": Salad, "🚴": Bike, "🏊": Waves };
 function systemParts(content: string) {
   const [emoji] = [...content];
   const Icon = SYSTEM_ICONS[emoji];

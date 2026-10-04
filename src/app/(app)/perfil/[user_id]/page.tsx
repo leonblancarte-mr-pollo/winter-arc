@@ -152,6 +152,8 @@ export default function PerfilPage() {
   const { person, checks, bonuses, activities } = data;
   const books = bonuses.filter((b) => b.type === "book");
   const halves = bonuses.filter((b) => b.type === "half_marathon");
+  // Actividades que ganaron el bonus por distancia (actividad -> puntos)
+  const cardioBonus = new Map(bonuses.filter((b) => b.type === "cardio_distance").map((b) => [b.activity_id, b.points]));
 
   return (
     <main className="mx-auto max-w-xl">
@@ -301,6 +303,7 @@ export default function PerfilPage() {
               <span className="flex-1">{ACTIVITY_TYPES.find((t) => t.key === a.type)?.label ?? a.type}</span>
               <span className="font-medium tabular-nums">{a.distance_km} km</span>
               {a.duration_min && <span className="tabular-nums text-fg3">{a.duration_min} min</span>}
+              {cardioBonus.has(a.id) && <span className="font-medium tabular-nums text-done">+{cardioBonus.get(a.id)}</span>}
             </li>
           ))}
         </ul>

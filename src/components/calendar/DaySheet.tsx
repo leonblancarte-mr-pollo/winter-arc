@@ -1,10 +1,10 @@
 "use client";
 // Panel de un día: los hábitos para tachar, progreso semanal y accesos a los bonus
-import { BookOpen, Camera, Check, ChevronDown, ChevronRight, Lock, Medal } from "lucide-react";
+import { BookOpen, Camera, Check, ChevronDown, ChevronRight, HeartPulse, Lock, Medal } from "lucide-react";
 import { useState } from "react";
 import HabitIcon from "@/components/HabitIcon";
 import { Sheet } from "@/components/ui";
-import { BOOK_BONUS, HALF_MARATHON_BONUS, WEEKLY_BONUSES } from "@/lib/constants";
+import { BOOK_BONUS, CARDIO_DISTANCE_BONUS, CARDIO_DISTANCE_MIN_KM, HALF_MARATHON_BONUS, WEEKLY_BONUSES } from "@/lib/constants";
 import { isEditableDay, longLabel } from "@/lib/dates";
 import { habitsOn, weekHabitCount, type ChecksByDate } from "@/lib/points";
 
@@ -166,6 +166,14 @@ export default function DaySheet({
         <div className="mt-6 grid grid-cols-2 gap-2">
           <BonusCard icon={<BookOpen size={16} />} label="Terminé un libro" points={BOOK_BONUS} onClick={() => onOpenBonus("book")} />
           <BonusCard icon={<Medal size={16} />} label="Corrí 21 km" points={HALF_MARATHON_BONUS} onClick={() => onOpenBonus("half")} />
+          {/* Sin botón: se otorga solo al tachar Cardio con la distancia (HabitPhotoModal) */}
+          <div className="col-span-2 flex items-start gap-3 rounded-xl border border-dashed border-line p-3 text-fg2">
+            <HeartPulse size={16} className="mt-0.5 shrink-0" />
+            <p className="text-xs leading-relaxed">
+              <span className="font-medium text-fg">Cardio: +{CARDIO_DISTANCE_BONUS} pts extra</span> si corres {CARDIO_DISTANCE_MIN_KM.running} km+, {CARDIO_DISTANCE_MIN_KM.bici} km+ en
+              bici o {CARDIO_DISTANCE_MIN_KM.natacion} km+ nadando. Se suma solo al tachar Cardio con tus km.
+            </p>
+          </div>
         </div>
       )}
     </Sheet>

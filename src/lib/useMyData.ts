@@ -168,10 +168,16 @@ export function useMyData(userId: string) {
 
   const addBonusLocal = useCallback((b: BonusEvent) => setBonuses((prev) => [b, ...prev]), []);
 
+  // Al destachar Cardio la base borra su bonus por distancia (supabase/cardio_distancia.sql); aquí se refleja al instante
+  const removeCardioBonusLocal = useCallback(
+    (date: string) => setBonuses((prev) => prev.filter((b) => !(b.type === "cardio_distance" && b.date === date))),
+    [],
+  );
+
   const markLocal = useCallback((date: string, key: string) => applyLocal(date, key, true), [applyLocal]);
 
   // Todo lo que suma o resta puntos además de los hábitos: bonus y compras de peseis
   const pointEvents = useMemo<PointEvent[]>(() => [...bonuses, ...spent], [bonuses, spent]);
 
-  return { checks, bonuses, pointEvents, loading, error, setError, reload: load, toggle, addBonusLocal, markLocal, pendingCount };
+  return { checks, bonuses, pointEvents, loading, error, setError, reload: load, toggle, addBonusLocal, removeCardioBonusLocal, markLocal, pendingCount };
 }

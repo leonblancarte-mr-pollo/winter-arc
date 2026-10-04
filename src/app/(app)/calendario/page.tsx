@@ -1,17 +1,17 @@
 "use client";
 // PANTALLA 1: Calendario de hábitos
-import { BookOpen, ChevronLeft, ChevronRight, Image as ImageIcon, LogOut, Medal } from "lucide-react";
+import { Bike, BookOpen, ChevronLeft, ChevronRight, Footprints, Image as ImageIcon, LogOut, Medal, Waves } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { BookForm, HalfMarathonForm } from "@/components/calendar/BonusForms";
 import CustomHabitsSection from "@/components/calendar/CustomHabitsSection";
 import DaySheet from "@/components/calendar/DaySheet";
-import HabitPhotoModal from "@/components/calendar/HabitPhotoModal";
+import HabitPhotoModal, { type CardioActivity } from "@/components/calendar/HabitPhotoModal";
 import { ErrorBox, PointsBurst, Ring, Spinner, SyncBadge, Wordmark } from "@/components/ui";
 import { COMPETITION_END, COMPETITION_MONTHS, PHOTO_HABITS } from "@/lib/constants";
 import { daysInMonth, isEditableDay, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
 import { countOn, currentStreak, maxOn, totalPoints } from "@/lib/points";
-import { supabase } from "@/lib/supabase";
+import { errorES, supabase } from "@/lib/supabase";
 import type { BonusEvent } from "@/lib/types";
 import { useDayPhotos, useEvidence } from "@/lib/evidence";
 import { useCustomHabits } from "@/lib/useCustomHabits";
@@ -26,7 +26,8 @@ export default function CalendarioPage() {
   const today = todayMX();
   const custom = useCustomHabits(userId);
   const evidence = useEvidence(userId);
-  const { checks, bonuses, pointEvents, loading, error, setError, reload, toggle, addBonusLocal, pendingCount } = useMyData(userId);
+  const { checks, bonuses, pointEvents, loading, error, setError, reload, toggle, addBonusLocal, removeCardioBonusLocal, pendingCount } =
+    useMyData(userId);
 
   // Mes inicial: el mes actual si está dentro de la carrera
   const initialIdx = Math.max(
@@ -49,13 +50,27 @@ export default function CalendarioPage() {
     if (!isEditableDay(date, today)) return;
     if (on && PHOTO_HABITS.includes(key)) return setPhotoFor({ key, date });
     if (!on) void evidence.remove(date, key);
+    // Al destachar Cardio, la base borra la actividad de ese día y su bonus (cardio_distancia.sql)
+    if (!on && key === "cardio") removeCardioBonusLocal(date);
     toggle(date, key, on);
   }
 
-  async function saveWithPhoto(key: string, file: File) {
+  // Guarda la foto, marca el hábito y, en Cardio, registra la actividad. El bonus por distancia
+  // lo crea la base (trigger en "activities"); aquí solo se lee para mostrarlo.
+  async function saveWithPhoto(key: string, file: File, activity: CardioActivity | null) {
     const date = photoFor?.date ?? today;
-    await evidence.save(date, key, file);
+    // Si un intento anterior ya guardó la foto pero falló la actividad, no se vuelve a subir
+    if (!evidence.rows.some((r) => r.date === date && r.habit_key === key)) await evidence.save(date, key, file);
     toggle(date, key, true);
+    if (!activity) return;
+    const { data, error } = await supabase
+      .from("activities")
+      .insert({ user_id: userId, date, type: activity.type, distance_km: activity.km, duration_min: activity.min, from_habit: true })
+      .select("id")
+      .single();
+    if (error) throw new Error(`Cardio quedó marcado, pero no se guardó la actividad: ${errorES(error.message)}`);
+    const { data: bonus } = await supabase.from("bonus_events").select("*").eq("activity_id", data.id).maybeSingle();
+    if (bonus) onBonusSaved(bonus as BonusEvent);
   }
 
   const pts = useMemo(() => totalPoints(checks, pointEvents), [checks, pointEvents]);
@@ -186,9 +201,9 @@ export default function CalendarioPage() {
           <ul className="card divide-y divide-white/[0.06] p-0">
             {bonuses.map((b) => (
               <li key={b.id} className="flex items-center gap-3 px-4 py-3">
-                {b.type === "book" ? <BookOpen size={16} className="shrink-0 text-fg2" /> : <Medal size={16} className="shrink-0 text-fg2" />}
+                <BonusIcon b={b} />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{b.type === "book" ? b.book_title : `Medio maratón, ${b.distance_km} km`}</div>
+                  <div className="truncate font-medium">{bonusTitle(b)}</div>
                   <div className="text-xs text-fg3">{shortLabel(b.date)}</div>
                 </div>
                 {b.photo_path && (
@@ -233,4 +248,18 @@ export default function CalendarioPage() {
       <PointsBurst points={burst} onDone={clearBurst} />
     </main>
   );
+}
+
+const CARDIO_LABELS: Record<string, string> = { running: "Running", bici: "Bici", natacion: "Natación" };
+
+function bonusTitle(b: BonusEvent) {
+  if (b.type === "book") return b.book_title;
+  if (b.type === "cardio_distance") return `${CARDIO_LABELS[b.activity_type ?? ""] ?? "Cardio"}, ${Number(b.distance_km)} km`;
+  return `Medio maratón, ${b.distance_km} km`;
+}
+
+function BonusIcon({ b }: { b: BonusEvent }) {
+  const Icon =
+    b.type === "book" ? BookOpen : b.type === "half_marathon" ? Medal : b.activity_type === "bici" ? Bike : b.activity_type === "natacion" ? Waves : Footprints;
+  return <Icon size={16} className="shrink-0 text-fg2" />;
 }

@@ -1,12 +1,13 @@
 # WINTER ARC — DOCUMENTACIÓN DE ARQUITECTURA
 
-> Última actualización: 2026-10-03 (Blindaje del casino — `supabase/casino_blindaje.sql`; antes ese día, hábito "Dieta" — `supabase/dieta.sql`; antes ese día, edición solo de hoy y ayer — `supabase/edicion_hoy_ayer.sql`; antes ese día, Grupos — `supabase/grupos.sql`).
+> Última actualización: 2026-10-04 (Bonus de cardio por distancia y actividad desde el calendario — `supabase/cardio_distancia.sql`; el 2026-10-03, blindaje del casino — `supabase/casino_blindaje.sql`; antes ese día, hábito "Dieta" — `supabase/dieta.sql`; antes ese día, edición solo de hoy y ayer — `supabase/edicion_hoy_ayer.sql`; antes ese día, Grupos — `supabase/grupos.sql`).
 > Versión Word: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (mismo contenido).
 > Audiencia: quien necesite continuar el proyecto sin preguntar.
 
 ## CHANGELOG
 
-- 2026-10-03 — **Blindaje del casino** (`supabase/casino_blindaje.sql`). Un usuario consiguió 5,000 peseis "extra"; la causa más probable fue comprar 5,000 peseis con saldo 0 mientras tenía toda su apuesta en una mano de blackjack abierta. Ahora: compra y easter egg exigen quiebra de verdad (sin mano abierta), cada apuesta abre una ronda y el premio solo se paga contra ella con tope por juego, el blackjack cobra antes de repartir (cerraba una carrera que permitía cobrar una mano sin haber pagado la apuesta), límite de 12 apuestas cada 10 s, y auditoría de saldos. Ver sección 9.
+- 2026-10-04 — **Bonus de cardio por distancia** (`supabase/cardio_distancia.sql`). El formulario manual de "Kilómetros" sale de Stats: la actividad (tipo, km, minutos) ahora se registra en el mismo modal de la foto al tachar Cardio. Si llega al umbral (running 5 km+, bici 20 km+, natación 2 km+) la base crea un bonus de +5 en `bonus_events` (`cardio_distance`), aparte del +1 del hábito y del +5 semanal de 3 cardios. Máximo uno por día. Anuncio en el chat ("🏃 X corrió 6km y ganó un bonus de +5 pts"). Ver sección 9.
+- 2026-10-03 — **Blindaje del casino** (`supabase/casino_blindaje.sql`). Un usuario consiguió 5,000 peseis "extra"; la causa más probable fue comprar 5,000 peseis con saldo 0 mientras tenía toda su apuesta en una mano de blackjack abierta. Ahora: compra y easter egg exigen quiebra de verdad (sin mano abierta), cada apuesta abre una ronda y el premio solo se paga contra ella con tope por juego, el blackjack cobra antes de repartir (cerraba una carrera que permitía cobrar una mano sin haber pagado la apuesta), límite de 12 apuestas cada 10 s, y auditoría de saldos. Ver sección 10.
 - 2026-10-03 — **Hábito nuevo "Dieta"** (10mo, key `dieta`, ícono `Salad`, pide foto). Máximo diario 10 y racha 8/10 desde el 2026-10-03; los días anteriores siguen con 9 y 7/9. Anuncio "🥗 X cuidó su dieta" en el chat.
 - 2026-10-03 — **Edición solo hoy y ayer**: los hábitos (oficiales y personales) solo se tachan/destachan hoy o ayer; antes de ayer es de solo lectura. Aplica al panel del día, a la importación de Hevy y a la cola offline, y lo refuerza RLS. No cambia ningún dato ya guardado.
 - 2026-10-03 — **Grupos**: el ranking de la carrera y el chat pasan a ser por grupo. Casino, ajedrez, hábitos, puntos, racha y evidencia siguen globales/por usuario. Grupo "WINTER ARC ORIGINAL" con todos los usuarios existentes. Solo el admin crea grupos; cualquiera se une con código.
@@ -34,8 +35,8 @@ src/
   app/
     login/                    Inicio de sesión / registro
     (app)/layout.tsx          Protege las pantallas con sesión; monta GroupProvider, BottomNav y DailyBanner
-    (app)/calendario          Marcar hábitos, bonus (libro, medio maratón), evidencia fotográfica
-    (app)/stats               Selector de grupo + resumen, ranking del grupo, gráficas, actividad, Hevy
+    (app)/calendario          Marcar hábitos, bonus (libro, medio maratón), evidencia fotográfica, km de cardio
+    (app)/stats               Selector de grupo + resumen, ranking del grupo, gráficas, km (solo lectura), Hevy
     (app)/chat                Chat en tiempo real del grupo activo (+ anuncios automáticos)
     (app)/casino/*            Ruleta, blackjack, tragamonedas (GLOBAL)
     (app)/ajedrez/*           Partidas entre usuarios (GLOBAL)
@@ -61,8 +62,8 @@ supabase/                     Scripts SQL (ver sección 5)
 |---|---|---|
 | `profiles` | Nombre visible (+ `avatar_override`) | Usuario |
 | `habit_checks` | Un hábito cumplido en un día | Usuario |
-| `bonus_events` | Libro (+5), medio maratón (+50) | Usuario |
-| `activities`, `workout_sets` | Km manuales, sets de Hevy (privados) | Usuario |
+| `bonus_events` | Libro (+5), medio maratón (+50), cardio por distancia (+5, lo crea un trigger) | Usuario |
+| `activities`, `workout_sets` | Km de cardio (desde el calendario; `from_habit`), sets de Hevy (privados) | Usuario |
 | `habit_evidence` | Foto de evidencia por hábito y día | Usuario |
 | `custom_habits`, `custom_habit_checks` | Hábitos personales privados, sin puntos | Usuario |
 | `leaderboard` (vista) | Total de puntos de cada usuario | Global (la app la filtra por grupo) |
@@ -82,7 +83,8 @@ supabase/                     Scripts SQL (ver sección 5)
 5. **`grupos.sql`** — grupos, admins, chat por grupo y migración a "WINTER ARC ORIGINAL". Se puede repetir.
 6. **`edicion_hoy_ayer.sql`** — reglas RLS de "solo hoy y ayer" (ver sección 7). Se puede repetir.
 7. **`dieta.sql`** — agrega "dieta" al anuncio automático de evidencia (ver sección 8). Se puede repetir.
-8. **`casino_blindaje.sql`** — rondas de juego, topes de premio, quiebra de verdad, límite de velocidad y auditoría (ver sección 9). Se puede repetir. Córrelo y sube el código en seguida: elimina `casino_apply`, que la versión anterior de la app usaba.
+8. **`casino_blindaje.sql`** — rondas de juego, topes de premio, quiebra de verdad, límite de velocidad y auditoría (ver sección 10). Se puede repetir. Córrelo y sube el código en seguida: elimina `casino_apply`, que la versión anterior de la app usaba.
+9. **`cardio_distancia.sql`** — `activities.from_habit`, bonus `cardio_distance` y sus triggers (ver sección 9). Se puede repetir. Córrelo **antes** de subir el código: la app nueva manda `from_habit` al guardar la actividad.
 
 ## 6. Grupos (ranking y chat por grupo)
 
@@ -157,7 +159,7 @@ Dónde vive la regla:
 - `useMyData.sync()`: si una acción offline quedó en cola hasta que su día se cerró, se descarta (si no, la base la rechazaría y atoraría la cola).
 - Base de datos (`edicion_hoy_ayer.sql`): función `is_editable_day(date)` usada en las políticas de INSERT y DELETE de `habit_checks`, `habit_evidence` y `custom_habit_checks`.
 
-No aplica a los bonus (libro, medio maratón), que tienen sus propias reglas de fecha.
+No aplica a los bonus de libro y medio maratón, que tienen sus propias reglas de fecha. El bonus de cardio por distancia sí sigue la regla (solo hoy o ayer, sección 9).
 
 ## 8. Hábitos
 
@@ -186,13 +188,57 @@ Hábitos agregados con la carrera ya empezada:
 
 Para agregar otro hábito con foto: entrada al final de `HABITS`, su fecha en `HABIT_SINCE`, ícono en `HabitIcon.tsx`, key en `PHOTO_HABITS`, texto en `HabitPhotoModal.tsx`, emoji→ícono en `SYSTEM_ICONS` del chat y un `when` en `announce_habit_evidence()` (SQL). Si cambia el máximo, ajustar la racha con una regla por fecha como la de Dieta.
 
-## 9. Casino: cómo se mueve el saldo (blindaje)
+## 9. Cardio: actividad desde el calendario y bonus por distancia
 
-### 9.1 Regla general
+### 9.1 Flujo
+
+1. En el panel del día (hoy o ayer) se tacha **Cardio** → se abre `HabitPhotoModal`, que en Cardio pide además: tipo (Running / Bici / Natación), km (obligatorio) y minutos (opcional). Muestra en vivo si esa distancia gana el bonus.
+2. Al guardar (`saveWithPhoto` en `calendario/page.tsx`): sube la foto (`habit_evidence`), marca el hábito (cola offline de `useMyData`) e inserta la actividad en `activities` con `from_habit = true`. Si la actividad falla, el modal muestra el error y al reintentar no vuelve a subir la foto.
+3. La base crea el bonus (si aplica) y lo anuncia en el chat. La app lee el bonus por `activity_id`, lo agrega a "Mis bonus" y muestra la animación de +5.
+
+Stats ya no tiene formulario: la sección "Kilómetros" (`stats/Activities.tsx`) conserva las gráficas (km por tipo, km por semana) y la lista de las últimas 10 con botón de borrar. Las actividades registradas antes desde Stats se quedan igual (`from_habit = false`).
+
+### 9.2 Regla del bonus
+
+| Tipo | Umbral (inclusive) | Bonus |
+|---|---|---|
+| Running | 5 km o más | +5 |
+| Bici | 20 km o más | +5 |
+| Natación | 2 km o más | +5 |
+
+- Se suma al +1 del hábito y al +5 semanal de "3 cardios en la semana"; no reemplaza nada.
+- **Máximo uno por usuario y día** (índice único `bonus_cardio_distance_dia`). Decisión: el calendario registra una actividad cada vez que se tacha Cardio (y destachar la borra), así que en la práctica solo hay una por día; el tope evita que alguien sume +5 varias veces insertando actividades por la API.
+- Solo hoy o ayer (`is_editable_day`), dentro de la carrera, con `from_habit = true` y con la foto de cardio de ese día ya guardada.
+- Los umbrales viven en dos lugares que deben coincidir: `CARDIO_DISTANCE_MIN_KM` (`src/lib/constants.ts`, para la UI) y `cardio_bonus_min_km()` (SQL, el que decide).
+
+### 9.3 Base de datos (`supabase/cardio_distancia.sql`)
+
+- `activities.from_habit boolean default false`.
+- `bonus_events`: tipo nuevo `cardio_distance`, columnas `activity_id` (FK a `activities`, `on delete cascade`) y `activity_type`; `distance_km` guarda los km. El check `bonus_valido` exige `points = 5`, `activity_id` y tipo válido.
+- La política de INSERT de `bonus_events` solo permite `book` y `half_marathon`: el de distancia lo crea únicamente el trigger.
+
+| Trigger | Tabla / evento | Qué hace |
+|---|---|---|
+| `activities_cardio_bonus_trigger` → `grant_cardio_distance_bonus()` | `activities` AFTER INSERT | Crea el bonus si cumple la regla 9.2 |
+| `habit_checks_cardio_cleanup_trigger` → `remove_cardio_habit_activities()` | `habit_checks` AFTER DELETE | Al destachar Cardio borra las actividades `from_habit` de ese día; su bonus se va por cascade |
+| `announce_bonus_trigger` (actualizado) | `bonus_events` AFTER INSERT | "🏃 X corrió 6km…", "🚴 X rodó 25km en bici…" o "🏊 X nadó 2.5km…" + "…y ganó un bonus de +5 pts" |
+| `announce_activity_trigger` (actualizado) | `activities` AFTER INSERT | Igual que antes (cardio > 3 km o > 20 min), pero no publica si esa actividad ya ganó el bonus, para no repetir el mensaje |
+
+El trigger del bonus se llama `activities_…` a propósito: Postgres corre los triggers del mismo evento en orden alfabético y debe ir antes que `announce_activity_trigger`.
+
+Los puntos no necesitan más cambios: la vista `leaderboard`, `points.ts`, el banner diario y el ranking ya suman cualquier fila de `bonus_events`. En el perfil público, las actividades con bonus muestran "+5"; en el chat, 🚴 y 🏊 tienen su ícono (`SYSTEM_ICONS`).
+
+### 9.4 UI en el panel del día
+
+Debajo de "Terminé un libro (+5)" y "Corrí 21 km (+50)" hay una nota sin botón: "Cardio: +5 pts extra si corres 5 km+, 20 km+ en bici o 2 km+ nadando. Se suma solo al tachar Cardio con tus km."
+
+## 10. Casino: cómo se mueve el saldo (blindaje)
+
+### 10.1 Regla general
 
 El navegador solo manda **qué quiere apostar** (fichas y casillas en la ruleta, monto en tragamonedas, monto y acción en blackjack). El resultado del juego (número de la ruleta, carretes, cartas) y el premio los calcula **el servidor** con `crypto.getRandomValues`. Ninguna ruta acepta un saldo, un premio ni un resultado del navegador; la ruleta además copia solo `type`, `value` y `amount` de cada apuesta.
 
-### 9.2 Rondas (`casino_rounds`)
+### 10.2 Rondas (`casino_rounds`)
 
 Cada apuesta abre una ronda (en blackjack, una por mano). Las funciones (`security definer`, solo `service_role`):
 
@@ -205,11 +251,11 @@ Cada apuesta abre una ronda (en blackjack, una por mano). Las funciones (`securi
 
 La función genérica `casino_apply` (que sumaba cualquier monto) se eliminó. En el servidor se usan con `placeBet`, `settleRound`, `raiseBet` y `refundRound` de `src/lib/server/casino.ts`. La mano de blackjack guarda su `roundId` (nunca se manda al navegador).
 
-### 9.3 Quiebra de verdad
+### 10.3 Quiebra de verdad
 
 `casino_is_broke(user)`: saldo 0 **y** sin ronda de blackjack abierta (últimas 24 h) ni otra ronda abierta en los últimos 5 minutos. Lo exigen `casino_buy_peseis` (5,000 peseis por 1 punto) y `casino_easter_egg` (50 peseis). Antes bastaba con saldo 0, así que se podía apostar todo en blackjack, comprar 5,000 con la mano abierta y luego plantarse.
 
-### 9.4 Carreras y repeticiones
+### 10.4 Carreras y repeticiones
 
 - Blackjack cobra **antes** de repartir. Antes repartía, guardaba y luego cobraba: en ese hueco otra petición podía plantarse y cobrar la mano; si el cobro después fallaba, la mano no se deshacía y el premio ya estaba pagado.
 - Al doblar, primero se guarda la jugada (con `version`) y luego se cobra; si no alcanza, se deshace.
@@ -217,24 +263,24 @@ La función genérica `casino_apply` (que sumaba cualquier monto) se eliminó. E
 - Límite: 12 apuestas por usuario cada 10 segundos (`demasiado rápido` → HTTP 429).
 - Compra y easter egg bloquean la fila del saldo (`for update`), así que dos llamadas a la vez no cobran dos veces.
 
-### 9.5 Auditoría
+### 10.5 Auditoría
 
 - `casino_transactions` ahora guarda `source` (ruta o función: `api/casino/roulette`, `rpc:casino_buy_peseis`, …), `round_id` y `balance_after`. Tipos: `bet`, `bet_win`, `bet_refund`, `buy_peseis`, `unlock_power`, `admin_grant`, `easter_egg`.
 - `casino_balance_audit` (trigger en `casino_balance`): cada cambio de saldo con saldo anterior, nuevo, diferencia, rol de base de datos y hora, aunque se haga a mano en el SQL Editor. Sin políticas RLS: solo se consulta desde Supabase.
 - Para cuadrar a un usuario: saldo actual = 10,000 + suma de `amount` de sus movimientos. Una diferencia indica un cambio de saldo que no pasó por las funciones del casino; `casino_balance_audit` dice cuándo.
 
-### 9.6 Pendiente fuera del casino
+### 10.6 Pendiente fuera del casino
 
 `habit_checks` acepta cualquier `habit_key` (ver sección 8), así que alguien podría insertar claves inventadas por la API y sumar puntos, y con ellos comprar peseis. No se cambió en este blindaje porque es lógica de hábitos.
 
-## 10. Seguridad (resumen)
+## 11. Seguridad (resumen)
 
 - RLS en todas las tablas. Escrituras sensibles (puntos del casino, apuestas, ajedrez, grupos) solo por funciones `security definer` o rutas del servidor con `service_role`.
-- Casino: resultados y premios solo en el servidor, pagos atados a rondas con tope por juego, auditoría de saldos (sección 9).
+- Casino: resultados y premios solo en el servidor, pagos atados a rondas con tope por juego, auditoría de saldos (sección 10).
 - Los anuncios del chat solo los puede crear la base de datos (triggers); el usuario no puede insertar `is_system = true`.
 - El admin se identifica por `user_id` en `app_admins`, nunca por algo que mande el navegador.
 
-## 11. Cómo correr
+## 12. Cómo correr
 
 1. `.env.local` con `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (y la `service_role` para las rutas del servidor; ver `.env.example`).
 2. Correr los SQL de la sección 5 en Supabase > SQL Editor.

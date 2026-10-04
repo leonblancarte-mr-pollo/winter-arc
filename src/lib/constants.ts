@@ -45,6 +45,12 @@ export const HALF_MARATHON_BONUS = 50;
 export const HALF_MARATHON_MIN_KM = 21;
 export const BOOK_REVIEW_MIN_CHARS = 20;
 
+// Bonus de cardio por distancia: +5 al tachar Cardio con una actividad que llegue al umbral
+// (km mínimos, inclusive). La misma regla vive en supabase/cardio_distancia.sql (cardio_bonus_min_km)
+export const CARDIO_DISTANCE_BONUS = 5;
+export const CARDIO_DISTANCE_MIN_KM = { running: 5, bici: 20, natacion: 2 } as const;
+export type CardioType = keyof typeof CARDIO_DISTANCE_MIN_KM;
+
 // Bonus semanales (semana de lunes a domingo)
 export const WEEKLY_BONUSES = [
   { habit: "cardio" as HabitKey, times: 3, points: 5, label: "3 cardios en la semana" },

@@ -1,6 +1,7 @@
 "use client";
-// 6) Registro manual de actividades (km) y sus gráficas
-import { Plus, Trash2 } from "lucide-react";
+// 6) Actividades (km) y sus gráficas. Se registran al tachar Cardio en el calendario (HabitPhotoModal);
+// aquí solo se ven y se pueden borrar (si tenía bonus por distancia, se borra con ella).
+import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartLegend, ErrorBox, SectionTitle, Spinner } from "@/components/ui";
@@ -21,14 +22,9 @@ const TYPE_COLORS: Record<ActivityType, string> = {
 const typeLabel = (t: string) => ACTIVITY_TYPES.find((a) => a.key === t)?.label ?? t;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-export default function Activities({ userId, today }: { userId: string; today: string }) {
+export default function Activities({ userId }: { userId: string }) {
   const [list, setList] = useState<Activity[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [date, setDate] = useState(today);
-  const [type, setType] = useState<ActivityType>("running");
-  const [km, setKm] = useState("");
-  const [min, setMin] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -46,27 +42,6 @@ export default function Activities({ userId, today }: { userId: string; today: s
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
-
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    const kmNum = Number(km.replace(",", "."));
-    const minNum = min.trim() ? Number(min) : null;
-    if (!date || date > today) return setError("La fecha no puede ser futura.");
-    if (!Number.isFinite(kmNum) || kmNum <= 0) return setError("Escribe los km (un número mayor a 0).");
-    if (minNum != null && (!Number.isInteger(minNum) || minNum <= 0)) return setError("Los minutos deben ser un número entero.");
-    setBusy(true);
-    const { data, error } = await supabase
-      .from("activities")
-      .insert({ user_id: userId, date, type, distance_km: kmNum, duration_min: minNum })
-      .select()
-      .single();
-    setBusy(false);
-    if (error) return setError(errorES(error.message));
-    setList((prev) => [{ ...(data as Activity), distance_km: Number(data.distance_km) }, ...(prev ?? [])].sort((a, b) => b.date.localeCompare(a.date)));
-    setKm("");
-    setMin("");
-  }
 
   async function remove(id: number) {
     const before = list;
@@ -98,37 +73,12 @@ export default function Activities({ userId, today }: { userId: string; today: s
     <section>
       <SectionTitle>Kilómetros</SectionTitle>
 
-      <form onSubmit={add} className="card flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Field label="Fecha">
-            <input className="input" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} />
-          </Field>
-          <Field label="Tipo">
-            <select className="input" value={type} onChange={(e) => setType(e.target.value as ActivityType)}>
-              {ACTIVITY_TYPES.map((t) => (
-                <option key={t.key} value={t.key}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Km">
-            <input className="input" inputMode="decimal" placeholder="5.2" value={km} onChange={(e) => setKm(e.target.value)} />
-          </Field>
-          <Field label="Minutos">
-            <input className="input" inputMode="numeric" placeholder="Opcional" value={min} onChange={(e) => setMin(e.target.value)} />
-          </Field>
-        </div>
-        {error && <ErrorBox message={error} />}
-        <button className="btn-primary sm:self-end" disabled={busy}>
-          <Plus size={16} /> {busy ? "Guardando" : "Agregar actividad"}
-        </button>
-      </form>
+      {error && <ErrorBox message={error} />}
 
       {!list ? (
         <Spinner />
       ) : list.length === 0 ? (
-        <p className="mt-4 text-center text-fg3">Registra tu primera actividad para ver tus kilómetros aquí.</p>
+        <p className="mt-4 text-center text-fg3">Tacha Cardio en el calendario con tus km para verlos aquí.</p>
       ) : (
         <>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -198,11 +148,3 @@ export default function Activities({ userId, today }: { userId: string; today: s
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-2">
-      <span className="label">{label}</span>
-      {children}
-    </label>
-  );
-}

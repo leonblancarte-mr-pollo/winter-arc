@@ -100,8 +100,8 @@ export default function StatsPage() {
       )}
 
       <h2 className="display mb-2 mt-16 text-4xl">Mi actividad</h2>
-      <p className="text-fg2">Kilómetros que registras a mano y entrenamientos importados de Hevy.</p>
-      <Activities userId={userId} today={today} />
+      <p className="text-fg2">Kilómetros que registras al tachar Cardio en el calendario y entrenamientos importados de Hevy.</p>
+      <Activities userId={userId} />
       <Gym userId={userId} today={today} onGymDaysMarked={onGymDaysMarked} />
     </main>
   );
