@@ -1,11 +1,12 @@
 # WINTER ARC — DOCUMENTACIÓN DE ARQUITECTURA
 
-> Última actualización: 2026-10-03 (Hábito "Dieta" — `supabase/dieta.sql`; antes ese día, edición solo de hoy y ayer — `supabase/edicion_hoy_ayer.sql`; antes ese día, Grupos — `supabase/grupos.sql`).
+> Última actualización: 2026-10-03 (Blindaje del casino — `supabase/casino_blindaje.sql`; antes ese día, hábito "Dieta" — `supabase/dieta.sql`; antes ese día, edición solo de hoy y ayer — `supabase/edicion_hoy_ayer.sql`; antes ese día, Grupos — `supabase/grupos.sql`).
 > Versión Word: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (mismo contenido).
 > Audiencia: quien necesite continuar el proyecto sin preguntar.
 
 ## CHANGELOG
 
+- 2026-10-03 — **Blindaje del casino** (`supabase/casino_blindaje.sql`). Un usuario consiguió 5,000 peseis "extra"; la causa más probable fue comprar 5,000 peseis con saldo 0 mientras tenía toda su apuesta en una mano de blackjack abierta. Ahora: compra y easter egg exigen quiebra de verdad (sin mano abierta), cada apuesta abre una ronda y el premio solo se paga contra ella con tope por juego, el blackjack cobra antes de repartir (cerraba una carrera que permitía cobrar una mano sin haber pagado la apuesta), límite de 12 apuestas cada 10 s, y auditoría de saldos. Ver sección 9.
 - 2026-10-03 — **Hábito nuevo "Dieta"** (10mo, key `dieta`, ícono `Salad`, pide foto). Máximo diario 10 y racha 8/10 desde el 2026-10-03; los días anteriores siguen con 9 y 7/9. Anuncio "🥗 X cuidó su dieta" en el chat.
 - 2026-10-03 — **Edición solo hoy y ayer**: los hábitos (oficiales y personales) solo se tachan/destachan hoy o ayer; antes de ayer es de solo lectura. Aplica al panel del día, a la importación de Hevy y a la cola offline, y lo refuerza RLS. No cambia ningún dato ya guardado.
 - 2026-10-03 — **Grupos**: el ranking de la carrera y el chat pasan a ser por grupo. Casino, ajedrez, hábitos, puntos, racha y evidencia siguen globales/por usuario. Grupo "WINTER ARC ORIGINAL" con todos los usuarios existentes. Solo el admin crea grupos; cualquiera se une con código.
@@ -65,7 +66,7 @@ supabase/                     Scripts SQL (ver sección 5)
 | `habit_evidence` | Foto de evidencia por hábito y día | Usuario |
 | `custom_habits`, `custom_habit_checks` | Hábitos personales privados, sin puntos | Usuario |
 | `leaderboard` (vista) | Total de puntos de cada usuario | Global (la app la filtra por grupo) |
-| `casino_*`, `power_log`, `power_unlocks` | Saldo de peseis, movimientos, poderes | Global |
+| `casino_*`, `power_log`, `power_unlocks` | Saldo de peseis, movimientos, rondas de juego, auditoría de saldos, poderes | Global |
 | `chess_*` | Partidas e invitaciones | Global |
 | `groups` | Grupos (nombre, código) | **Nuevo** |
 | `group_members` | Quién está en qué grupo | **Nuevo** |
@@ -81,6 +82,7 @@ supabase/                     Scripts SQL (ver sección 5)
 5. **`grupos.sql`** — grupos, admins, chat por grupo y migración a "WINTER ARC ORIGINAL". Se puede repetir.
 6. **`edicion_hoy_ayer.sql`** — reglas RLS de "solo hoy y ayer" (ver sección 7). Se puede repetir.
 7. **`dieta.sql`** — agrega "dieta" al anuncio automático de evidencia (ver sección 8). Se puede repetir.
+8. **`casino_blindaje.sql`** — rondas de juego, topes de premio, quiebra de verdad, límite de velocidad y auditoría (ver sección 9). Se puede repetir. Córrelo y sube el código en seguida: elimina `casino_apply`, que la versión anterior de la app usaba.
 
 ## 6. Grupos (ranking y chat por grupo)
 
@@ -184,13 +186,55 @@ Hábitos agregados con la carrera ya empezada:
 
 Para agregar otro hábito con foto: entrada al final de `HABITS`, su fecha en `HABIT_SINCE`, ícono en `HabitIcon.tsx`, key en `PHOTO_HABITS`, texto en `HabitPhotoModal.tsx`, emoji→ícono en `SYSTEM_ICONS` del chat y un `when` en `announce_habit_evidence()` (SQL). Si cambia el máximo, ajustar la racha con una regla por fecha como la de Dieta.
 
-## 9. Seguridad (resumen)
+## 9. Casino: cómo se mueve el saldo (blindaje)
+
+### 9.1 Regla general
+
+El navegador solo manda **qué quiere apostar** (fichas y casillas en la ruleta, monto en tragamonedas, monto y acción en blackjack). El resultado del juego (número de la ruleta, carretes, cartas) y el premio los calcula **el servidor** con `crypto.getRandomValues`. Ninguna ruta acepta un saldo, un premio ni un resultado del navegador; la ruleta además copia solo `type`, `value` y `amount` de cada apuesta.
+
+### 9.2 Rondas (`casino_rounds`)
+
+Cada apuesta abre una ronda (en blackjack, una por mano). Las funciones (`security definer`, solo `service_role`):
+
+| Función | Qué hace |
+|---|---|
+| `casino_place_bet(user, game, stake, source, meta)` | Bloquea el saldo del usuario, aplica el límite de velocidad, cobra y abre la ronda. Regresa `{round_id, balance}`. |
+| `casino_raise_bet(user, round, extra, source)` | Blackjack: doblar. Solo una vez por mano y solo por el monto original. |
+| `casino_settle(user, round, payout, source, meta)` | Cierra la ronda y paga. Falla si la ronda no es del usuario, ya se cerró, o si el premio pasa de `apuesta × multiplicador máximo` (ruleta 36, tragamonedas 250, blackjack 2.5). |
+| `casino_refund(user, round, source)` | Si la jugada no se pudo guardar, regresa exactamente lo apostado (`bet_refund`). |
+
+La función genérica `casino_apply` (que sumaba cualquier monto) se eliminó. En el servidor se usan con `placeBet`, `settleRound`, `raiseBet` y `refundRound` de `src/lib/server/casino.ts`. La mano de blackjack guarda su `roundId` (nunca se manda al navegador).
+
+### 9.3 Quiebra de verdad
+
+`casino_is_broke(user)`: saldo 0 **y** sin ronda de blackjack abierta (últimas 24 h) ni otra ronda abierta en los últimos 5 minutos. Lo exigen `casino_buy_peseis` (5,000 peseis por 1 punto) y `casino_easter_egg` (50 peseis). Antes bastaba con saldo 0, así que se podía apostar todo en blackjack, comprar 5,000 con la mano abierta y luego plantarse.
+
+### 9.4 Carreras y repeticiones
+
+- Blackjack cobra **antes** de repartir. Antes repartía, guardaba y luego cobraba: en ese hueco otra petición podía plantarse y cobrar la mano; si el cobro después fallaba, la mano no se deshacía y el premio ya estaba pagado.
+- Al doblar, primero se guarda la jugada (con `version`) y luego se cobra; si no alcanza, se deshace.
+- Cada ronda se paga una sola vez (candado `for update` y `status = 'open'`), aunque lleguen dos peticiones iguales.
+- Límite: 12 apuestas por usuario cada 10 segundos (`demasiado rápido` → HTTP 429).
+- Compra y easter egg bloquean la fila del saldo (`for update`), así que dos llamadas a la vez no cobran dos veces.
+
+### 9.5 Auditoría
+
+- `casino_transactions` ahora guarda `source` (ruta o función: `api/casino/roulette`, `rpc:casino_buy_peseis`, …), `round_id` y `balance_after`. Tipos: `bet`, `bet_win`, `bet_refund`, `buy_peseis`, `unlock_power`, `admin_grant`, `easter_egg`.
+- `casino_balance_audit` (trigger en `casino_balance`): cada cambio de saldo con saldo anterior, nuevo, diferencia, rol de base de datos y hora, aunque se haga a mano en el SQL Editor. Sin políticas RLS: solo se consulta desde Supabase.
+- Para cuadrar a un usuario: saldo actual = 10,000 + suma de `amount` de sus movimientos. Una diferencia indica un cambio de saldo que no pasó por las funciones del casino; `casino_balance_audit` dice cuándo.
+
+### 9.6 Pendiente fuera del casino
+
+`habit_checks` acepta cualquier `habit_key` (ver sección 8), así que alguien podría insertar claves inventadas por la API y sumar puntos, y con ellos comprar peseis. No se cambió en este blindaje porque es lógica de hábitos.
+
+## 10. Seguridad (resumen)
 
 - RLS en todas las tablas. Escrituras sensibles (puntos del casino, apuestas, ajedrez, grupos) solo por funciones `security definer` o rutas del servidor con `service_role`.
+- Casino: resultados y premios solo en el servidor, pagos atados a rondas con tope por juego, auditoría de saldos (sección 9).
 - Los anuncios del chat solo los puede crear la base de datos (triggers); el usuario no puede insertar `is_system = true`.
 - El admin se identifica por `user_id` en `app_admins`, nunca por algo que mande el navegador.
 
-## 10. Cómo correr
+## 11. Cómo correr
 
 1. `.env.local` con `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (y la `service_role` para las rutas del servidor; ver `.env.example`).
 2. Correr los SQL de la sección 5 en Supabase > SQL Editor.

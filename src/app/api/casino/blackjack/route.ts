@@ -4,9 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { handValue, isBlackjack, newDeck } from "@/lib/casino/blackjack";
 import { dealHand, draw, settle, toPublic, type Hand, type Row } from "@/lib/casino/blackjackEngine";
 import { shuffle } from "@/lib/casino/rng";
-import { applyBalance, handleError, HttpError, requireUser } from "@/lib/server/casino";
+import { handleError, HttpError, placeBet, raiseBet, refundRound, requireUser, settleRound } from "@/lib/server/casino";
 
 const MAX_BET = 1_000_000_000;
+const SOURCE = "api/casino/blackjack";
 
 // Lee (o crea) el mazo y la mano del usuario
 async function load(db: SupabaseClient, userId: string): Promise<Row> {
@@ -52,6 +53,15 @@ export async function POST(req: Request) {
     const v = row.version;
     let balance: number | null = null;
 
+    // Ronda (apuesta ya cobrada) de la mano en curso. Sin ronda no hay pago posible.
+    async function openRound(): Promise<number> {
+      const roundId = row.hand?.roundId;
+      if (roundId) return roundId;
+      row.hand = null;
+      await save(db, userId, row, v);
+      throw new HttpError(409, "Esa mano era de una versión anterior del casino. Reparte una nueva.");
+    }
+
     switch (body.action) {
       case "state":
         break;
@@ -62,16 +72,17 @@ export async function POST(req: Request) {
         if (typeof bet !== "number" || !Number.isInteger(bet) || bet < 1 || bet > MAX_BET) {
           throw new HttpError(400, "Arma tu apuesta con las fichas antes de repartir.");
         }
-        if ((await currentBalance(db, userId)) < bet) throw new HttpError(400, "No tienes peseis suficientes para esa apuesta.");
-        const before: Row = { shoe: [...row.shoe], hand: row.hand, version: v };
+        // 1) Cobra PRIMERO (falla si no alcanza). Así ninguna otra petición puede cobrar
+        //    una mano cuya apuesta todavía no se pagó.
+        const bet0 = await placeBet(db, userId, "blackjack", bet, SOURCE);
+        balance = bet0.balance;
 
-        dealHand(row, bet);
-        await save(db, userId, row, v);
-
+        // 2) Reparte y guarda; si otra petición ganó la carrera, regresa la apuesta
+        dealHand(row, bet, bet0.roundId);
         try {
-          balance = await applyBalance(db, userId, -bet, "bet", "blackjack");
+          await save(db, userId, row, v);
         } catch (e) {
-          await save(db, userId, before, row.version).catch(() => {}); // deshace la mano si no alcanzó el saldo
+          await refundRound(db, userId, bet0.roundId, SOURCE).catch(() => {});
           throw e;
         }
 
@@ -80,50 +91,57 @@ export async function POST(req: Request) {
         if (isBlackjack(dealt.player) || isBlackjack(dealt.dealer)) {
           settle(row);
           await save(db, userId, row, row.version);
-          if (dealt.payout) balance = await applyBalance(db, userId, dealt.payout, "bet_win", "blackjack", { result: dealt.result });
+          balance = await settleRound(db, userId, bet0.roundId, dealt.payout ?? 0, SOURCE, { result: dealt.result });
         }
         break;
       }
 
       case "hit": {
         if (row.hand?.status !== "player") throw new HttpError(409, "No hay una mano en curso.");
-        row.hand.player.push(draw(row));
+        const roundId = await openRound();
+        const hand = row.hand!;
+        hand.player.push(draw(row));
         // Si se pasa de 21 pierde; si llega a 21 se planta solo
-        if (handValue(row.hand.player).total >= 21) settle(row);
+        if (handValue(hand.player).total >= 21) settle(row);
         await save(db, userId, row, v);
         // settle() puede haber terminado la mano (TypeScript no lo detecta solo)
-        const finished = (row.hand.status as Hand["status"]) === "done";
-        if (finished && row.hand.payout) {
-          balance = await applyBalance(db, userId, row.hand.payout, "bet_win", "blackjack", { result: row.hand.result });
+        if ((hand.status as Hand["status"]) === "done") {
+          balance = await settleRound(db, userId, roundId, hand.payout ?? 0, SOURCE, { result: hand.result });
         }
         break;
       }
 
       case "stand": {
         if (row.hand?.status !== "player") throw new HttpError(409, "No hay una mano en curso.");
+        const roundId = await openRound();
+        const hand = row.hand!;
         settle(row);
         await save(db, userId, row, v);
-        if (row.hand.payout) balance = await applyBalance(db, userId, row.hand.payout, "bet_win", "blackjack", { result: row.hand.result });
+        balance = await settleRound(db, userId, roundId, hand.payout ?? 0, SOURCE, { result: hand.result });
         break;
       }
 
       case "double": {
-        const hand = row.hand;
-        if (hand?.status !== "player") throw new HttpError(409, "No hay una mano en curso.");
-        if (hand.player.length !== 2 || hand.doubled) throw new HttpError(400, "Solo puedes doblar con tus primeras 2 cartas.");
-        // Cobra la segunda apuesta primero (falla si no alcanza)
-        balance = await applyBalance(db, userId, -hand.bet, "bet", "blackjack", { double: true });
+        if (row.hand?.status !== "player") throw new HttpError(409, "No hay una mano en curso.");
+        if (row.hand.player.length !== 2 || row.hand.doubled) throw new HttpError(400, "Solo puedes doblar con tus primeras 2 cartas.");
+        const roundId = await openRound();
+        const before: Row = structuredClone({ shoe: row.shoe, hand: row.hand, version: v });
+        const hand = row.hand!;
         hand.bet *= 2;
         hand.doubled = true;
         hand.player.push(draw(row)); // al doblar recibe exactamente una carta más
         settle(row);
+        // 1) Guarda la jugada (si llega otra petición igual, recibe 409 y no cobra nada)
+        await save(db, userId, row, v);
+        // 2) Cobra la segunda apuesta; si no alcanza, deshace la jugada
         try {
-          await save(db, userId, row, v);
+          await raiseBet(db, userId, roundId, before.hand!.bet, SOURCE);
         } catch (e) {
-          await applyBalance(db, userId, hand.bet / 2, "bet_win", "blackjack", { refund: true }).catch(() => {});
+          await save(db, userId, before, row.version).catch(() => {});
           throw e;
         }
-        if (hand.payout) balance = await applyBalance(db, userId, hand.payout, "bet_win", "blackjack", { result: hand.result });
+        // 3) Paga y cierra la ronda
+        balance = await settleRound(db, userId, roundId, hand.payout ?? 0, SOURCE, { result: hand.result, double: true });
         break;
       }
 

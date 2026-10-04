@@ -57,33 +57,72 @@ export async function requireUser(req: Request): Promise<{ userId: string; db: S
   return { userId: data.user.id, db };
 }
 
-// Suma o resta peseis de forma atómica y registra el movimiento. Regresa el saldo nuevo.
-export async function applyBalance(
+export type Game = "ruleta" | "blackjack" | "tragamonedas";
+
+// Llama una función SQL del casino y traduce sus errores a mensajes claros.
+// El saldo SOLO se mueve con estas funciones: cada apuesta abre una ronda y el premio
+// solo se paga contra esa ronda, una vez, y con un tope de apuesta × multiplicador del juego.
+async function casinoRpc(db: SupabaseClient, fn: string, args: Record<string, unknown>): Promise<unknown> {
+  const { data, error } = await db.rpc(fn, args);
+  if (error) {
+    const m = error.message;
+    if (m.includes("saldo insuficiente")) throw new HttpError(400, "No tienes peseis suficientes para esa apuesta.");
+    if (m.includes("demasiado rápido")) throw new HttpError(429, "Vas muy rápido. Espera unos segundos.");
+    if (m.includes("apuesta fuera de rango")) throw new HttpError(400, "Esa apuesta no es válida.");
+    if (m.includes("ronda inválida") || m.includes("no se puede doblar")) throw new HttpError(409, "Esa jugada ya se procesó.");
+    if (m.includes("premio fuera de rango")) {
+      console.error("[casino] premio fuera de rango", args);
+      throw new HttpError(500, "Ocurrió un error inesperado en el casino.");
+    }
+    if (m.includes("does not exist") || error.code === "PGRST202" || m.includes("check constraint")) {
+      throw new HttpError(500, "Falta actualizar el casino: corre supabase/casino_blindaje.sql en Supabase.");
+    }
+    throw new HttpError(500, `Error del casino: ${m}`);
+  }
+  return data;
+}
+
+// Cobra la apuesta y abre una ronda. Falla si no alcanza el saldo.
+export async function placeBet(
   db: SupabaseClient,
   userId: string,
-  delta: number,
-  type: "bet" | "bet_win",
-  game: "ruleta" | "blackjack" | "tragamonedas",
+  game: Game,
+  stake: number,
+  source: string,
+  meta?: Record<string, unknown>,
+): Promise<{ roundId: number; balance: number }> {
+  const data = (await casinoRpc(db, "casino_place_bet", {
+    p_user: userId,
+    p_game: game,
+    p_stake: stake,
+    p_source: source,
+    p_meta: meta ?? null,
+  })) as { round_id: number; balance: number };
+  return { roundId: Number(data.round_id), balance: Number(data.balance) };
+}
+
+// Cierra la ronda pagando el premio calculado por el servidor (0 si perdió). Regresa el saldo nuevo.
+export async function settleRound(
+  db: SupabaseClient,
+  userId: string,
+  roundId: number,
+  payout: number,
+  source: string,
   meta?: Record<string, unknown>,
 ): Promise<number> {
-  const { data, error } = await db.rpc("casino_apply", {
-    p_user: userId,
-    p_delta: delta,
-    p_type: type,
-    p_game: game,
-    p_meta: meta ?? null,
-  });
-  if (error) {
-    if (error.message.includes("saldo insuficiente")) throw new HttpError(400, "No tienes peseis suficientes para esa apuesta.");
-    if (error.message.includes("check constraint")) {
-      throw new HttpError(500, "Falta actualizar el casino: corre supabase/ajedrez_y_tragamonedas.sql en Supabase.");
-    }
-    if (error.message.includes("does not exist") || error.code === "PGRST202") {
-      throw new HttpError(500, "Falta crear las tablas del casino: corre supabase/casino.sql en Supabase.");
-    }
-    throw new HttpError(500, `Error del casino: ${error.message}`);
-  }
-  return Number(data);
+  return Number(
+    await casinoRpc(db, "casino_settle", { p_user: userId, p_round: roundId, p_payout: payout, p_source: source, p_meta: meta ?? null }),
+  );
+}
+
+// Blackjack: cobra la segunda apuesta al doblar (una vez por mano)
+export async function raiseBet(db: SupabaseClient, userId: string, roundId: number, extra: number, source: string): Promise<number> {
+  return Number(await casinoRpc(db, "casino_raise_bet", { p_user: userId, p_round: roundId, p_extra: extra, p_source: source, p_meta: null }));
+}
+
+// Regresa lo apostado si la jugada no se pudo guardar
+export async function refundRound(db: SupabaseClient, userId: string, roundId: number, source: string): Promise<number> {
+  return Number(await casinoRpc(db, "casino_refund", { p_user: userId, p_round: roundId, p_source: source }));
 }
 
 // Respuesta JSON estándar para las rutas del casino

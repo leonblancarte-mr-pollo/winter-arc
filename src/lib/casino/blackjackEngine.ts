@@ -11,6 +11,7 @@ export type Hand = {
   status: "player" | "done";
   result?: BlackjackResult;
   payout?: number;
+  roundId?: number; // ronda en casino_rounds (la apuesta cobrada); nunca se manda al navegador
 };
 export type Row = { shoe: Card[]; hand: Hand | null; version: number };
 
@@ -25,8 +26,8 @@ export function draw(row: Row): Card {
 }
 
 // Reparte una mano nueva en el orden real: jugador, dealer (arriba), jugador, dealer (abajo)
-export function dealHand(row: Row, bet: number) {
-  row.hand = { bet, player: [], dealer: [], doubled: false, status: "player" };
+export function dealHand(row: Row, bet: number, roundId?: number) {
+  row.hand = { bet, player: [], dealer: [], doubled: false, status: "player", roundId };
   row.hand.player.push(draw(row));
   row.hand.dealer.push(draw(row));
   row.hand.player.push(draw(row));

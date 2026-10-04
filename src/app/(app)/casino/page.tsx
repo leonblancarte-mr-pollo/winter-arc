@@ -22,9 +22,11 @@ const POWERS: { type: PowerType; title: string; text: string }[] = [
 const TX_TEXT: Record<CasinoTransaction["type"], string> = {
   bet: "Apuesta",
   bet_win: "Premio",
+  bet_refund: "Apuesta devuelta",
   buy_peseis: "Compra de peseis",
   unlock_power: "Poder desbloqueado",
   admin_grant: "Regalo de peseis",
+  easter_egg: "Sorpresa",
 };
 
 export default function CasinoPage() {

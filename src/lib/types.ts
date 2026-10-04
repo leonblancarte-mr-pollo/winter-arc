@@ -73,11 +73,14 @@ export type LeaderboardRow = {
 export type CasinoTransaction = {
   id: number;
   user_id: string;
-  type: "bet" | "bet_win" | "buy_peseis" | "unlock_power" | "admin_grant";
+  type: "bet" | "bet_win" | "bet_refund" | "buy_peseis" | "unlock_power" | "admin_grant" | "easter_egg";
   amount: number;
   game: "ruleta" | "blackjack" | "tragamonedas" | null;
   points_cost: number;
   meta: Record<string, unknown> | null;
+  source?: string | null;
+  round_id?: number | null;
+  balance_after?: number | null;
   created_at: string;
 };
 
