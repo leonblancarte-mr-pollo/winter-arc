@@ -6,12 +6,16 @@ import { useState } from "react";
 import { ErrorBox, Sheet } from "@/components/ui";
 import { CARDIO_DISTANCE_BONUS, CARDIO_DISTANCE_MIN_KM, HABITS, type CardioType } from "@/lib/constants";
 
-export type CardioActivity = { type: CardioType; km: number; min: number | null };
+export type CardioKind = CardioType | "otro";
+export type CardioActivity =
+  | { type: CardioType; km: number; min: number | null; description: null }
+  | { type: "otro"; km: null; min: number; description: string };
 
-const CARDIO_TYPES: { key: CardioType; label: string }[] = [
+const CARDIO_TYPES: { key: CardioKind; label: string }[] = [
   { key: "running", label: "Running" },
   { key: "bici", label: "Bici" },
   { key: "natacion", label: "Natación" },
+  { key: "otro", label: "Otros" },
 ];
 
 export default function HabitPhotoModal({
@@ -27,17 +31,19 @@ export default function HabitPhotoModal({
   onSave: (habitKey: string, file: File, activity: CardioActivity | null) => Promise<void>;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [cardioType, setCardioType] = useState<CardioType>("running");
+  const [cardioType, setCardioType] = useState<CardioKind>("running");
   const [km, setKm] = useState("");
   const [min, setMin] = useState("");
+  const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const habit = HABITS.find((h) => h.key === habitKey);
   if (!habitKey || !habit) return null;
   const isCardio = habitKey === "cardio";
-  const minKm = CARDIO_DISTANCE_MIN_KM[cardioType];
+  const isOtro = cardioType === "otro";
+  const minKm = cardioType !== "otro" ? CARDIO_DISTANCE_MIN_KM[cardioType] : null;
   const kmNum = Number(km.replace(",", "."));
-  const earnsBonus = isCardio && Number.isFinite(kmNum) && kmNum >= minKm;
+  const earnsBonus = isCardio && minKm != null && Number.isFinite(kmNum) && kmNum >= minKm;
 
   function close() {
     setFile(null);
@@ -51,12 +57,17 @@ export default function HabitPhotoModal({
     if (!file.type.startsWith("image/")) return setError("El archivo debe ser una imagen.");
     if (file.size > 10 * 1024 * 1024) return setError("La foto pesa más de 10 MB. Usa una más ligera.");
     let activity: CardioActivity | null = null;
-    if (isCardio) {
+    if (isCardio && cardioType === "otro") {
+      const minNum = Number(min);
+      if (!Number.isInteger(minNum) || minNum <= 0) return setError("Escribe los minutos (un número entero mayor a 0).");
+      if (!description.trim()) return setError("Describe la actividad.");
+      activity = { type: "otro", km: null, min: minNum, description: description.trim() };
+    } else if (isCardio && cardioType !== "otro") {
       const kmNum = Number(km.replace(",", "."));
       const minNum = min.trim() ? Number(min) : null;
       if (!Number.isFinite(kmNum) || kmNum <= 0 || kmNum >= 1000) return setError("Escribe los km (un número mayor a 0).");
       if (minNum != null && (!Number.isInteger(minNum) || minNum <= 0)) return setError("Los minutos deben ser un número entero.");
-      activity = { type: cardioType, km: Math.round(kmNum * 100) / 100, min: minNum };
+      activity = { type: cardioType, km: Math.round(kmNum * 100) / 100, min: minNum, description: null };
     }
     setBusy(true);
     setError(null);
@@ -94,7 +105,7 @@ export default function HabitPhotoModal({
         </label>
         {isCardio && (
           <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Tipo de cardio">
+            <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Tipo de cardio">
               {CARDIO_TYPES.map((t) => (
                 <button
                   key={t.key}
@@ -110,23 +121,44 @@ export default function HabitPhotoModal({
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-2">
-                <span className="label">Km</span>
-                <input className="input" inputMode="decimal" placeholder="5.2" value={km} onChange={(e) => setKm(e.target.value)} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="label">Minutos</span>
-                <input className="input" inputMode="numeric" placeholder="Opcional" value={min} onChange={(e) => setMin(e.target.value)} />
-              </label>
-            </div>
-            <p className={`text-xs ${earnsBonus ? "text-done" : "text-fg3"}`}>
-              {earnsBonus ? `¡Ganas +${CARDIO_DISTANCE_BONUS} pts extra por distancia!` : `+${CARDIO_DISTANCE_BONUS} pts extra desde ${minKm} km.`}
-            </p>
+            {isOtro ? (
+              <div className="flex flex-col gap-3">
+                <label className="flex flex-col gap-2">
+                  <span className="label">Minutos</span>
+                  <input className="input" inputMode="numeric" placeholder="30" value={min} onChange={(e) => setMin(e.target.value)} />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="label">Descripción de la actividad</span>
+                  <input
+                    className="input"
+                    placeholder="Ej. clase de box, remo, escalada..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    maxLength={200}
+                  />
+                </label>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-2">
+                    <span className="label">Km</span>
+                    <input className="input" inputMode="decimal" placeholder="5.2" value={km} onChange={(e) => setKm(e.target.value)} />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="label">Minutos</span>
+                    <input className="input" inputMode="numeric" placeholder="Opcional" value={min} onChange={(e) => setMin(e.target.value)} />
+                  </label>
+                </div>
+                <p className={`text-xs ${earnsBonus ? "text-done" : "text-fg3"}`}>
+                  {earnsBonus ? `¡Ganas +${CARDIO_DISTANCE_BONUS} pts extra por distancia!` : `+${CARDIO_DISTANCE_BONUS} pts extra desde ${minKm} km.`}
+                </p>
+              </>
+            )}
           </div>
         )}
         {error && <ErrorBox message={error} />}
-        <button className="btn-primary" disabled={!file || busy || (isCardio && !km.trim())}>
+        <button className="btn-primary" disabled={!file || busy || (isCardio && (isOtro ? !min.trim() || !description.trim() : !km.trim()))}>
           {busy ? "Guardando" : "Guardar"}
         </button>
       </form>

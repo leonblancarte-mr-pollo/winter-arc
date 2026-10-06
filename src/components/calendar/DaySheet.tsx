@@ -18,6 +18,7 @@ export default function DaySheet({
   readOnly = false,
   extra,
   photos,
+  adminOverride = false,
 }: {
   date: string | null;
   today: string;
@@ -31,6 +32,8 @@ export default function DaySheet({
   extra?: React.ReactNode;
   // Fotos de evidencia del día (hábito -> URL)
   photos?: Record<string, string>;
+  // Admin, solo el día del override (ver ADMIN_OVERRIDE_DAY): deja editar días anteriores
+  adminOverride?: boolean;
 }) {
   // Evidencias expandidas (se vuelven a colapsar al cambiar de día)
   const [expanded, setExpanded] = useState<{ date: string | null; keys: string[] }>({ date: null, keys: [] });
@@ -41,7 +44,8 @@ export default function DaySheet({
   const isFuture = date > today;
   const isPast = date < today;
   // Antes de ayer: se ve lo que se marcó, pero ya no se puede cambiar
-  const locked = isPast && !isEditableDay(date, today);
+  // (salvo el día del override de admin, ver ADMIN_OVERRIDE_DAY)
+  const locked = isPast && !isEditableDay(date, today) && !adminOverride;
   const blocked = isFuture || readOnly || locked;
   const done = checks[date] ?? new Set<string>();
   // Dieta solo aparece desde el día en que se agregó

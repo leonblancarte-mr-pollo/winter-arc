@@ -11,7 +11,8 @@ export type HabitCheck = { user_id: string; date: string; habit_key: string };
 export type BonusEvent = {
   id: number;
   user_id: string;
-  type: "book" | "half_marathon" | "cardio_distance";
+  // "adjustment": ajuste manual del admin (supabase/ajustes_puntos.sql), ej. reembolsos
+  type: "book" | "half_marathon" | "cardio_distance" | "adjustment";
   points: number;
   date: string;
   book_title: string | null;
@@ -21,6 +22,8 @@ export type BonusEvent = {
   // Solo en "cardio_distance" (supabase/cardio_distancia.sql): la actividad que lo ganó
   activity_id?: number | null;
   activity_type?: string | null;
+  // Solo en "adjustment" (supabase/ajustes_puntos.sql): motivo del ajuste
+  label?: string | null;
   created_at: string;
 };
 
@@ -29,8 +32,10 @@ export type Activity = {
   user_id: string;
   date: string;
   type: ActivityType;
-  distance_km: number;
+  distance_km: number | null;
   duration_min: number | null;
+  // Solo en cardio tipo "otro" (supabase/cardio_otros.sql): qué se hizo
+  description?: string | null;
   // Se registró al tachar Cardio en el calendario (puede faltar si aún no se corrió cardio_distancia.sql)
   from_habit?: boolean;
   created_at: string;

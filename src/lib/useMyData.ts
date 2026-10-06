@@ -16,7 +16,9 @@ import type { BonusEvent, HabitCheck } from "./types";
 // Cada cuánto se revisa si hay cambios pendientes de subir
 const SYNC_INTERVAL_MS = 5000;
 
-export function useMyData(userId: string) {
+// allowBackfill: el día del override de admin (ADMIN_OVERRIDE_DAY), deja sincronizar
+// días anteriores a hoy/ayer en vez de descartarlos de la cola.
+export function useMyData(userId: string, allowBackfill = false) {
   const [checks, setChecks] = useState<ChecksByDate>({});
   const [bonuses, setBonuses] = useState<BonusEvent[]>([]);
   // Puntos gastados en el casino (se restan del total)
@@ -99,7 +101,8 @@ export function useMyData(userId: string) {
       for (const a of pending) {
         // Quedó en cola hasta que el día ya no se puede editar: se descarta (la base lo rechazaría
         // y atoraría la cola). Al recargar, la pantalla muestra lo que de verdad quedó guardado.
-        if (!isEditableDay(a.date, today)) {
+        // Excepción: el día del override de admin, que sí puede subir días anteriores.
+        if (!isEditableDay(a.date, today) && !allowBackfill) {
           await markActionSynced(a.id);
           continue;
         }
@@ -119,7 +122,7 @@ export function useMyData(userId: string) {
     } finally {
       syncingRef.current = false;
     }
-  }, [userId, refreshPendingCount]);
+  }, [userId, allowBackfill, refreshPendingCount]);
 
   useEffect(() => {
     // Carga datos de Supabase al abrir la pantalla (los setState ocurren después de la respuesta)

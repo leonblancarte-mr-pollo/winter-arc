@@ -57,14 +57,14 @@ export default function Activities({ userId }: { userId: string }) {
   const byType = ACTIVITY_TYPES.map((t) => ({
     name: t.label,
     key: t.key,
-    km: round1((list ?? []).filter((a) => a.type === t.key).reduce((s, a) => s + a.distance_km, 0)),
+    km: round1((list ?? []).filter((a) => a.type === t.key).reduce((s, a) => s + (a.distance_km ?? 0), 0)),
   }));
 
   // Km por semana (semanas de la carrera), apilado por tipo
   const byWeek = competitionWeeks().map((monday) => {
     const row: Record<string, number | string> = { semana: shortLabel(monday < COMPETITION_START ? COMPETITION_START : monday) };
     for (const t of ACTIVITY_TYPES) {
-      row[t.label] = round1((list ?? []).filter((a) => a.type === t.key && weekStart(a.date) === monday).reduce((s, a) => s + a.distance_km, 0));
+      row[t.label] = round1((list ?? []).filter((a) => a.type === t.key && weekStart(a.date) === monday).reduce((s, a) => s + (a.distance_km ?? 0), 0));
     }
     return row;
   });
@@ -133,8 +133,8 @@ export default function Activities({ userId }: { userId: string }) {
               <li key={a.id} className="flex items-center gap-3 px-4 py-3">
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TYPE_COLORS[a.type] }} />
                 <span className="w-12 shrink-0 text-fg3">{shortLabel(a.date)}</span>
-                <span className="flex-1">{typeLabel(a.type)}</span>
-                <span className="font-medium tabular-nums">{a.distance_km} km</span>
+                <span className="flex-1 truncate">{a.type === "otro" && a.description ? a.description : typeLabel(a.type)}</span>
+                {a.type !== "otro" && <span className="font-medium tabular-nums">{a.distance_km} km</span>}
                 {a.duration_min && <span className="tabular-nums text-fg3">{a.duration_min} min</span>}
                 <button onClick={() => remove(a.id)} className="icon-btn hover:text-danger" aria-label="Borrar actividad">
                   <Trash2 size={16} />

@@ -1,6 +1,6 @@
 "use client";
 // PANTALLA 1: Calendario de hábitos
-import { Bike, BookOpen, ChevronLeft, ChevronRight, Footprints, Image as ImageIcon, LogOut, Medal, Waves } from "lucide-react";
+import { Bike, BookOpen, ChevronLeft, ChevronRight, Footprints, Image as ImageIcon, LogOut, Medal, ShieldCheck, Wallet, Waves } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { BookForm, HalfMarathonForm } from "@/components/calendar/BonusForms";
@@ -8,7 +8,8 @@ import CustomHabitsSection from "@/components/calendar/CustomHabitsSection";
 import DaySheet from "@/components/calendar/DaySheet";
 import HabitPhotoModal, { type CardioActivity } from "@/components/calendar/HabitPhotoModal";
 import { ErrorBox, PointsBurst, Ring, Spinner, SyncBadge, Wordmark } from "@/components/ui";
-import { COMPETITION_END, COMPETITION_MONTHS, PHOTO_HABITS } from "@/lib/constants";
+import { useGroups } from "@/components/GroupProvider";
+import { ADMIN_OVERRIDE_DAY, COMPETITION_END, COMPETITION_MONTHS, PHOTO_HABITS } from "@/lib/constants";
 import { daysInMonth, isEditableDay, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
 import { countOn, currentStreak, maxOn, totalPoints } from "@/lib/points";
 import { errorES, supabase } from "@/lib/supabase";
@@ -24,10 +25,13 @@ export default function CalendarioPage() {
   const { user, profile, signOut } = useAuth();
   const userId = user!.id;
   const today = todayMX();
+  const { isAdmin } = useGroups();
+  // Hoy es el único día en que el admin puede editar sus días anteriores (ver ADMIN_OVERRIDE_DAY)
+  const adminOverride = isAdmin && today === ADMIN_OVERRIDE_DAY;
   const custom = useCustomHabits(userId);
   const evidence = useEvidence(userId);
   const { checks, bonuses, pointEvents, loading, error, setError, reload, toggle, addBonusLocal, removeCardioBonusLocal, pendingCount } =
-    useMyData(userId);
+    useMyData(userId, adminOverride);
 
   // Mes inicial: el mes actual si está dentro de la carrera
   const initialIdx = Math.max(
@@ -47,7 +51,7 @@ export default function CalendarioPage() {
   // Solo se tacha/destacha hoy y ayer (antes de ayer es de solo lectura).
   // Los hábitos con foto piden evidencia en esos dos días. Al destachar uno con foto, se quita también la evidencia.
   function onToggle(date: string, key: string, on: boolean) {
-    if (!isEditableDay(date, today)) return;
+    if (!isEditableDay(date, today) && !adminOverride) return;
     if (on && PHOTO_HABITS.includes(key)) return setPhotoFor({ key, date });
     if (!on) void evidence.remove(date, key);
     // Al destachar Cardio, la base borra la actividad de ese día y su bonus (cardio_distancia.sql)
@@ -65,10 +69,19 @@ export default function CalendarioPage() {
     if (!activity) return;
     const { data, error } = await supabase
       .from("activities")
-      .insert({ user_id: userId, date, type: activity.type, distance_km: activity.km, duration_min: activity.min, from_habit: true })
+      .insert({
+        user_id: userId,
+        date,
+        type: activity.type,
+        distance_km: activity.km,
+        duration_min: activity.min,
+        description: activity.description,
+        from_habit: true,
+      })
       .select("id")
       .single();
     if (error) throw new Error(`Cardio quedó marcado, pero no se guardó la actividad: ${errorES(error.message)}`);
+    if (activity.type === "otro") return;
     const { data: bonus } = await supabase.from("bonus_events").select("*").eq("activity_id", data.id).maybeSingle();
     if (bonus) onBonusSaved(bonus as BonusEvent);
   }
@@ -108,6 +121,12 @@ export default function CalendarioPage() {
           </button>
         </div>
       </header>
+
+      {adminOverride && (
+        <div className="mt-4 flex items-center gap-2 rounded-lg bg-accent/10 px-3 py-2 text-sm text-accent">
+          <ShieldCheck size={16} className="shrink-0" /> Modo admin: hoy puedes editar tus días anteriores. Queda registrado en la bitácora.
+        </div>
+      )}
 
       {/* Resumen */}
       <section className="mt-8">
@@ -225,7 +244,15 @@ export default function CalendarioPage() {
         onClose={() => setPhotoFor(null)}
         onSave={saveWithPhoto}
       />
-      <DaySheet date={openDay} today={today} checks={checks} onToggle={onToggle} photos={dayPhotos} onClose={() => setOpenDay(null)} onOpenBonus={openBonus}
+      <DaySheet
+        date={openDay}
+        today={today}
+        checks={checks}
+        onToggle={onToggle}
+        photos={dayPhotos}
+        onClose={() => setOpenDay(null)}
+        onOpenBonus={openBonus}
+        adminOverride={adminOverride}
         extra={
           openDay && (
             <CustomHabitsSection
@@ -255,11 +282,22 @@ const CARDIO_LABELS: Record<string, string> = { running: "Running", bici: "Bici"
 function bonusTitle(b: BonusEvent) {
   if (b.type === "book") return b.book_title;
   if (b.type === "cardio_distance") return `${CARDIO_LABELS[b.activity_type ?? ""] ?? "Cardio"}, ${Number(b.distance_km)} km`;
+  if (b.type === "adjustment") return b.label ?? "Ajuste de puntos";
   return `Medio maratón, ${b.distance_km} km`;
 }
 
 function BonusIcon({ b }: { b: BonusEvent }) {
   const Icon =
-    b.type === "book" ? BookOpen : b.type === "half_marathon" ? Medal : b.activity_type === "bici" ? Bike : b.activity_type === "natacion" ? Waves : Footprints;
+    b.type === "book"
+      ? BookOpen
+      : b.type === "half_marathon"
+      ? Medal
+      : b.type === "adjustment"
+      ? Wallet
+      : b.activity_type === "bici"
+      ? Bike
+      : b.activity_type === "natacion"
+      ? Waves
+      : Footprints;
   return <Icon size={16} className="shrink-0 text-fg2" />;
 }
