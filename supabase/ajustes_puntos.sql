@@ -65,7 +65,7 @@ create policy "bonus: insertar los míos" on public.bonus_events
 insert into public.bonus_events (user_id, type, points, date, label)
 select p.id, 'adjustment', 17, (now() at time zone 'America/Mexico_City')::date, 'ajuste: reembolso comprar peseis'
 from public.profiles p
-where p.display_name ilike 'kevincito'
+where p.display_name ilike 'kevincito tontito cabezoncito'
   and not exists (
     select 1 from public.bonus_events b
     where b.user_id = p.id and b.type = 'adjustment' and b.label = 'ajuste: reembolso comprar peseis'
