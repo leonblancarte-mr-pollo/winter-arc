@@ -16,7 +16,7 @@ import type { BonusEvent, HabitCheck } from "./types";
 // Cada cuánto se revisa si hay cambios pendientes de subir
 const SYNC_INTERVAL_MS = 5000;
 
-// allowBackfill: el día del override de admin (ADMIN_OVERRIDE_DAY), deja sincronizar
+// allowBackfill: en los días del override de admin (ADMIN_OVERRIDE_DAYS), deja sincronizar
 // días anteriores a hoy/ayer en vez de descartarlos de la cola.
 export function useMyData(userId: string, allowBackfill = false) {
   const [checks, setChecks] = useState<ChecksByDate>({});

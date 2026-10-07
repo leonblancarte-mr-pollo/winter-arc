@@ -9,10 +9,10 @@ export const TIMEZONE = "America/Mexico_City";
 export const COMPETITION_START = "2026-10-01";
 export const COMPETITION_END = "2026-12-31";
 
-// Único día en que el admin de la app puede tachar/destachar SUS hábitos de cualquier
-// día anterior (no solo hoy/ayer). Misma fecha que is_admin_override_day() en
+// Días en que el admin de la app puede tachar/destachar SUS hábitos de cualquier
+// día anterior (no solo hoy/ayer). Misma lista que is_admin_override_day() en
 // supabase/admin_override_backfill.sql: cámbiala en los dos lugares si se repite.
-export const ADMIN_OVERRIDE_DAY = "2026-10-05";
+export const ADMIN_OVERRIDE_DAYS: readonly string[] = ["2026-10-05", "2026-10-06"];
 
 // Meses que se pueden ver en el calendario (año, mes 1-12)
 export const COMPETITION_MONTHS = [

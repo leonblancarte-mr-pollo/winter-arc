@@ -32,7 +32,7 @@ export default function DaySheet({
   extra?: React.ReactNode;
   // Fotos de evidencia del día (hábito -> URL)
   photos?: Record<string, string>;
-  // Admin, solo el día del override (ver ADMIN_OVERRIDE_DAY): deja editar días anteriores
+  // Admin, solo en los días del override (ver ADMIN_OVERRIDE_DAYS): deja editar días anteriores
   adminOverride?: boolean;
 }) {
   // Evidencias expandidas (se vuelven a colapsar al cambiar de día)
@@ -44,7 +44,7 @@ export default function DaySheet({
   const isFuture = date > today;
   const isPast = date < today;
   // Antes de ayer: se ve lo que se marcó, pero ya no se puede cambiar
-  // (salvo el día del override de admin, ver ADMIN_OVERRIDE_DAY)
+  // (salvo los días del override de admin, ver ADMIN_OVERRIDE_DAYS)
   const locked = isPast && !isEditableDay(date, today) && !adminOverride;
   const blocked = isFuture || readOnly || locked;
   const done = checks[date] ?? new Set<string>();

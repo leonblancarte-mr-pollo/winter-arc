@@ -4,15 +4,15 @@
 -- Corre después de migracion.sql, evidencia_habitos.sql, edicion_hoy_ayer.sql
 -- y grupos.sql (usa public.is_app_admin()). Se puede correr más de una vez.
 --
--- Qué hace: SOLO el 2026-10-05 (hora de Ciudad de México), el admin de la
--- app (public.is_app_admin(), hoy nada más leon.blancarte@gmail.com) puede
--- tachar/destachar SUS PROPIOS hábitos oficiales y subir su propia evidencia
--- de cualquier día de la carrera, no solo hoy/ayer. Sigue siendo SOLO para
--- su propia cuenta: no puede tocar los hábitos de otra persona.
+-- Qué hace: SOLO el 2026-10-05 o el 2026-10-06 (hora de Ciudad de México), el
+-- admin de la app (public.is_app_admin(), hoy nada más leon.blancarte@gmail.com)
+-- puede tachar/destachar SUS PROPIOS hábitos oficiales y subir su propia
+-- evidencia de cualquier día de la carrera, no solo hoy/ayer. Sigue siendo
+-- SOLO para su propia cuenta: no puede tocar los hábitos de otra persona.
 --
 -- Cada vez que se use fuera de la ventana normal (hoy/ayer) queda guardado
 -- en admin_overrides_log: quién, cuándo, para qué día y qué hábito, y si
--- fue para marcarlo o para borrarlo. A partir del 2026-10-06,
+-- fue para marcarlo o para borrarlo. A partir del 2026-10-07,
 -- is_admin_override_day() regresa falso sola y todo vuelve a la regla
 -- normal (solo hoy y ayer, supabase/edicion_hoy_ayer.sql).
 --
@@ -20,13 +20,13 @@
 -- regla de siempre.
 -- =====================================================================
 
--- ¿Hoy es el día del override? Misma fecha que ADMIN_OVERRIDE_DAY en
+-- ¿Hoy es un día del override? Misma lista que ADMIN_OVERRIDE_DAYS en
 -- src/lib/constants.ts: cámbiala en los dos lugares si se repite.
 create or replace function public.is_admin_override_day()
 returns boolean
 language sql stable
 as $$
-  select (now() at time zone 'America/Mexico_City')::date = date '2026-10-05';
+  select (now() at time zone 'America/Mexico_City')::date in (date '2026-10-05', date '2026-10-06');
 $$;
 
 -- Bitácora: queda todo lo que se tocó fuera de la ventana normal de hoy/ayer

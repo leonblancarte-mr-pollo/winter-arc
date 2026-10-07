@@ -9,7 +9,7 @@ import DaySheet from "@/components/calendar/DaySheet";
 import HabitPhotoModal, { type CardioActivity } from "@/components/calendar/HabitPhotoModal";
 import { ErrorBox, PointsBurst, Ring, Spinner, SyncBadge, Wordmark } from "@/components/ui";
 import { useGroups } from "@/components/GroupProvider";
-import { ADMIN_OVERRIDE_DAY, COMPETITION_END, COMPETITION_MONTHS, PHOTO_HABITS } from "@/lib/constants";
+import { ADMIN_OVERRIDE_DAYS, COMPETITION_END, COMPETITION_MONTHS, PHOTO_HABITS } from "@/lib/constants";
 import { daysInMonth, isEditableDay, MONTH_NAMES, shortLabel, todayMX, WEEKDAY_SHORT, weekdayMon0, ymd } from "@/lib/dates";
 import { countOn, currentStreak, maxOn, totalPoints } from "@/lib/points";
 import { errorES, supabase } from "@/lib/supabase";
@@ -26,8 +26,8 @@ export default function CalendarioPage() {
   const userId = user!.id;
   const today = todayMX();
   const { isAdmin } = useGroups();
-  // Hoy es el único día en que el admin puede editar sus días anteriores (ver ADMIN_OVERRIDE_DAY)
-  const adminOverride = isAdmin && today === ADMIN_OVERRIDE_DAY;
+  // Hoy es uno de los días en que el admin puede editar sus días anteriores (ver ADMIN_OVERRIDE_DAYS)
+  const adminOverride = isAdmin && ADMIN_OVERRIDE_DAYS.includes(today);
   const custom = useCustomHabits(userId);
   const evidence = useEvidence(userId);
   const { checks, bonuses, pointEvents, loading, error, setError, reload, toggle, addBonusLocal, removeCardioBonusLocal, pendingCount } =
