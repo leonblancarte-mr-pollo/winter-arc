@@ -57,16 +57,5 @@ create policy "bonus: insertar los míos" on public.bonus_events
     or (type = 'adjustment' and public.is_app_admin())
   );
 
--- ---------------------------------------------------------------------
--- DATO PUNTUAL: reembolso de 17 puntos a Kevincito (comprar peseis)
--- Se puede correr más de una vez: si ya existe un ajuste con esta misma
--- nota para Kevincito, no se vuelve a insertar.
--- ---------------------------------------------------------------------
-insert into public.bonus_events (user_id, type, points, date, label)
-select p.id, 'adjustment', 17, (now() at time zone 'America/Mexico_City')::date, 'ajuste: reembolso comprar peseis'
-from public.profiles p
-where p.display_name ilike 'kevincito tontito cabezoncito'
-  and not exists (
-    select 1 from public.bonus_events b
-    where b.user_id = p.id and b.type = 'adjustment' and b.label = 'ajuste: reembolso comprar peseis'
-  );
+-- (El reembolso puntual de +17 a Kevincito se quitó el 2026-10-07: sus compras
+-- de peseis se borraron en supabase/kevincito_fix.sql y ya no hace falta.)

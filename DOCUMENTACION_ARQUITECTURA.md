@@ -6,6 +6,8 @@
 
 ## CHANGELOG
 
+- 2026-10-07 — **Kevincito: puntos corregidos y compra de peseis bloqueada** (`supabase/kevincito_fix.sql`). Se borró su ajuste de +17 y todas sus transacciones `buy_peseis`, así que sus 22 puntos de hábitos vuelven a verse completos en el ranking y las gráficas (conserva los peseis que ya tenía). Además `casino_buy_peseis()` rechaza solo a su `user_id` con el mensaje "No puedes gastar tus puntos de hábitos en el casino, eres un pobre pendejo Kevin"; el resto del casino sigue igual para él. Ver sección 14.
+- 2026-10-07 — **Documentado: ajustes de puntos, override de admin y cardio "Otros"** (ya estaban en el código desde el 2026-10-05, sin documentar). Investigación de "los 17 puntos de Kevincito no aparecen": en el código no hay ningún filtro por `type` que excluya `adjustment`; ver sección 13.
 - 2026-10-04 — **Bonus de cardio por distancia** (`supabase/cardio_distancia.sql`). El formulario manual de "Kilómetros" sale de Stats: la actividad (tipo, km, minutos) ahora se registra en el mismo modal de la foto al tachar Cardio. Si llega al umbral (running 5 km+, bici 20 km+, natación 2 km+) la base crea un bonus de +5 en `bonus_events` (`cardio_distance`), aparte del +1 del hábito y del +5 semanal de 3 cardios. Máximo uno por día. Anuncio en el chat ("🏃 X corrió 6km y ganó un bonus de +5 pts"). Ver sección 9.
 - 2026-10-03 — **Blindaje del casino** (`supabase/casino_blindaje.sql`). Un usuario consiguió 5,000 peseis "extra"; la causa más probable fue comprar 5,000 peseis con saldo 0 mientras tenía toda su apuesta en una mano de blackjack abierta. Ahora: compra y easter egg exigen quiebra de verdad (sin mano abierta), cada apuesta abre una ronda y el premio solo se paga contra ella con tope por juego, el blackjack cobra antes de repartir (cerraba una carrera que permitía cobrar una mano sin haber pagado la apuesta), límite de 12 apuestas cada 10 s, y auditoría de saldos. Ver sección 10.
 - 2026-10-03 — **Hábito nuevo "Dieta"** (10mo, key `dieta`, ícono `Salad`, pide foto). Máximo diario 10 y racha 8/10 desde el 2026-10-03; los días anteriores siguen con 9 y 7/9. Anuncio "🥗 X cuidó su dieta" en el chat.
@@ -85,6 +87,8 @@ supabase/                     Scripts SQL (ver sección 5)
 7. **`dieta.sql`** — agrega "dieta" al anuncio automático de evidencia (ver sección 8). Se puede repetir.
 8. **`casino_blindaje.sql`** — rondas de juego, topes de premio, quiebra de verdad, límite de velocidad y auditoría (ver sección 10). Se puede repetir. Córrelo y sube el código en seguida: elimina `casino_apply`, que la versión anterior de la app usaba.
 9. **`cardio_distancia.sql`** — `activities.from_habit`, bonus `cardio_distance` y sus triggers (ver sección 9). Se puede repetir. Córrelo **antes** de subir el código: la app nueva manda `from_habit` al guardar la actividad.
+10. **`ajustes_puntos.sql`**, **`admin_override_backfill.sql`**, **`cardio_otros.sql`** — ver sección 13. Se pueden repetir; corren después de `cardio_distancia.sql`.
+11. **`kevincito_fix.sql`** — limpieza de datos y bloqueo de compra de peseis para un usuario (ver sección 14). Se puede repetir; corre después de `casino_blindaje.sql`.
 
 ## 6. Grupos (ranking y chat por grupo)
 
@@ -285,3 +289,21 @@ La función genérica `casino_apply` (que sumaba cualquier monto) se eliminó. E
 1. `.env.local` con `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` (y la `service_role` para las rutas del servidor; ver `.env.example`).
 2. Correr los SQL de la sección 5 en Supabase > SQL Editor.
 3. `npm install` y `npm run dev` → http://localhost:3000
+
+## 13. Ajustes de puntos (`supabase/ajustes_puntos.sql`)
+
+- `bonus_events.type = 'adjustment'` + columna `label`: el admin suma o resta puntos reales a cualquiera (`points <> 0`, `label` obligatorio). Solo el admin (`is_app_admin()`) puede insertarlos; libro y medio maratón siguen siendo de cada quien.
+- El script ya no inserta ningún ajuste. (El +17 de Kevincito que traía se retiró el 2026-10-07; ver sección 14.)
+- **Dónde se suman** (ninguno filtra por `type`): vista `leaderboard` (`sum(points)` de todo `bonus_events`), `useRanking` (`select *` con `date` entre `COMPETITION_START` y `COMPETITION_END`), `useMyData`, perfil público, `DailyBanner`. El ajuste se muestra con su `label` en "Mis bonus" (`calendario/page.tsx`).
+- **Los puntos gastados en peseis** (`casino_transactions.points_cost`, 1 por compra) se restan en la vista y en el front (`fetchSpentPoints`, fechados el día de la compra). Un reembolso de N puntos solo *compensa* esa resta: el total vuelve a lo que era antes de comprar, no sube N sobre eso.
+- Un ajuste con `date` fuera del 2026-10-01…2026-12-31 cuenta en `leaderboard` pero NO en las gráficas.
+
+Otros scripts del 2026-10-05: `admin_override_backfill.sql` (el admin puede tachar sus propios hábitos de cualquier día solo el 05 y 06 de octubre; bitácora en `admin_overrides_log`; `ADMIN_OVERRIDE_DAYS` en `constants.ts` debe coincidir con `is_admin_override_day()`) y `cardio_otros.sql` (Cardio "Otros": foto + minutos + descripción, sin km ni bonus).
+
+## 14. Kevincito: limpieza y bloqueo de compra de peseis (`supabase/kevincito_fix.sql`)
+
+Usuario: `b1c3ff4c-9a4b-4352-be68-cccef4ad7db2` ("Kevincito tontito cabezoncito").
+
+- **Datos:** borra su `bonus_events` de tipo `adjustment` (+17) y todas sus `casino_transactions` de tipo `buy_peseis`. La vista `leaderboard` y `fetchSpentPoints` (que lee esas transacciones) dejan de restarle puntos: quedan sus 22 puntos de hábitos, día a día en la gráfica. NO se toca `casino_balance`, así que conserva sus peseis. Consecuencia para la auditoría (10.5): su saldo ya no cuadra con `10,000 + suma de amount`, por esas compras borradas.
+- **Bloqueo:** `casino_buy_peseis()` revisa `auth.uid()` al inicio y, si es ese usuario, lanza "No puedes gastar tus puntos de hábitos en el casino, eres un pobre pendejo Kevin". El `user_id` está escrito en la función, en `kevincito_fix.sql` y en `casino_blindaje.sql` (para que volver a correr el blindaje no quite el bloqueo). Los demás usuarios compran igual; Kevincito sigue jugando, apostando y comprando poderes.
+- **Frontend:** sin cambios de código. `casino/page.tsx` muestra tal cual el mensaje del error de la RPC (`casinoErrorES` → `errorES` devuelve el texto desconocido sin cambiar). El botón "Comprar" no se oculta; al pulsarlo sale el mensaje.

@@ -312,6 +312,10 @@ declare
   v_points int;
 begin
   if v_user is null then raise exception 'sin sesión'; end if;
+  -- Kevincito no puede gastar puntos de hábitos en el casino (ver kevincito_fix.sql)
+  if v_user = 'b1c3ff4c-9a4b-4352-be68-cccef4ad7db2'::uuid then
+    raise exception 'No puedes gastar tus puntos de hábitos en el casino, eres un pobre pendejo Kevin';
+  end if;
   insert into public.casino_balance (user_id) values (v_user) on conflict do nothing;
   -- El candado hace que dos compras al mismo tiempo se procesen una por una
   select balance into v_balance from public.casino_balance where user_id = v_user for update;
